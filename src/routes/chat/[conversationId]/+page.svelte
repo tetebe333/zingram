@@ -1172,7 +1172,7 @@ function handleCameraCapture(event: Event) {
      <input type="file" onchange={handleImageChange} bind:this={imageInput} accept="image/*" class="hidden" />
      <input type="file" onchange={handleVideoChange} bind:this={videoInput} accept="video/*" class="hidden" />
      <input type="file" bind:this={documentInput} onchange={handleDocumentChange} accept=".pdf,.doc,.docx,.txt,.zip,.rar,.html,.css,.js,.dart,text/html,text/css,application/javascript" class="hidden"/>
-     <input type="file" onchange={handleCameraCapture} bind:this={cameraInput} accept="image/*,video/" capture="environment" class="hidden" />
+     <input type="file" onchange={handleCameraCapture} bind:this={cameraInput} accept="image/*,video/*" capture="environment" class="hidden" />
 
 
 
