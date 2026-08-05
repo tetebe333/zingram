@@ -1,2 +1,64 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
+
+@theme {
+  /* 1. Changed "steps" to "ease-in-out" for a smooth transition */
+  --animate-blink: blink 2s ease-in-out infinite;
+
+  /* 2. Changed "visibility" to "opacity" so it fades gracefully */
+  @keyframes blink {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.2; /* Adjust this to 0 if you want it to fade completely out */
+    }
+  }
+}
+
+.log-btn{
+    @apply  text-sm bg-linear-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-500 text-white py-4 px-20  rounded-lg shadow-md transition duration-300 ease-in-out ;
+}
+
+.reg-btn{
+    @apply border-2 border-blue-400 text-sm hover:bg-linear-to-r hover:from-blue-500 hover:to-blue-600  text-blue-500 hover:text-white py-4 px-18  rounded-lg shadow-md transition duration-300 ease-in-out;
+}
+
+.input-field{
+    @apply bg-slate-900  ps-11 pe-4 py-2 border border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500;
+}
+
+
+
+.input-fieldInvalid{
+    @apply bg-slate-900  ps-11 pe-4 py-2 border border-red-500 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500;
+}
+
+.input-icon{
+    @apply absolute left-4 top-3 inline mb-1 me-1 text-gray-500;
+}
+
+
+.uploadAvataBtn{
+    @apply mt-7 font-semibold  text-sm bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600 text-white py-4   rounded-lg shadow-md transition duration-300 ease-in-out ;
+}
+
+.Search-input{
+    @apply w-full bg-white/10 backdrop-blur-md ps-10 pe-4 py-3 border border-slate-900 rounded-3xl focus:outline-none  focus:border-white/10;
+}
+/* [#171d31]  */
+.search-input-icon{
+        @apply z-10 absolute left-8 top-8 inline mb-1 me-1 text-gray-500;
+
+}
+
+
+
+.fogInput-field{
+    @apply bg-slate-900  ps-11 pe-4 py-3 border border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500;
+}
+
+
+.fogInput-icon{
+    @apply absolute left-4 top-4 inline mb-1 me-1 text-gray-500;
+}
