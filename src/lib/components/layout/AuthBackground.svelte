@@ -1,5 +1,6 @@
 <script lang="ts">
     // No script needed for now
+     let { children } = $props();
 </script>
 
 <div class="relative min-h-screen overflow-hidden bg-[#03081A]">
@@ -48,7 +49,9 @@
 
     <!-- Page Content -->
     <div class=" z-10 min-h-screen">
-        <slot />
+         {#if children}
+             {@render children()}
+         {/if}
     </div>
 
 </div>
