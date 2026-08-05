@@ -136,6 +136,10 @@ let selectedVideo = $state<File | null>(null);
 let videoPreviewUrl = $state('');
 let sendingMessage = $state(false)
 
+//camera let
+//svelte-ignore non_reactive_update
+let cameraInput: HTMLInputElement;
+
 const bars = [4,6,5,7,4,8,5,9,6,5,7,4,6,8,5,7,4,6,5,8];
 let online = true;
 let messageText = $state('');
@@ -663,6 +667,11 @@ function openVideoPicker() {
 }
 
 //open document picker
+function openCamera() {
+    cameraInput.click();
+}
+
+//open document picker
 function openDocumentPicker() {
     documentInput.click();
 }
@@ -738,6 +747,58 @@ function handleDocumentChange(event: Event) {
     documentName = file.name;
 
     documentSize = file.size;
+}
+
+function handleCameraCapture(event: Event) {
+
+    const input = event.target as HTMLInputElement;
+
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+
+    // ---------- IMAGE ----------
+    if (file.type.startsWith("image/")) {
+
+        selectedImage = file;
+
+        imagePreviewUrl = URL.createObjectURL(file);
+
+        return;
+    }
+
+    // ---------- VIDEO ----------
+    if (file.type.startsWith("video/")) {
+
+        const tempVideo = document.createElement("video");
+
+        tempVideo.preload = "metadata";
+
+        tempVideo.onloadedmetadata = () => {
+
+            URL.revokeObjectURL(tempVideo.src);
+
+            if (tempVideo.duration > 60) {
+
+                alert("Please upload a video that is 1 minute or less.");
+
+                if (cameraInput) {
+                    cameraInput.value = "";
+                }
+
+                return;
+            }
+
+            selectedVideo = file;
+
+            videoPreviewUrl = URL.createObjectURL(file);
+
+        };
+
+        tempVideo.src = URL.createObjectURL(file);
+
+    }
+
 }
 
 
@@ -1108,17 +1169,19 @@ function handleDocumentChange(event: Event) {
 
 
      <!-- image input -->
-     <input type="file" onchange={handleImageChange} bind:this={imageInput} accept="image/*" class="hidded" />
-     <input type="file" onchange={handleVideoChange} bind:this={videoInput} accept="video/*" class="hidded" />
-    <input type="file" bind:this={documentInput} onchange={handleDocumentChange} accept=".pdf,.doc,.docx,.txt,.zip,.rar,.html,.css,.js,.dart,text/html,text/css,application/javascript" class="hidden"/>
-        
+     <input type="file" onchange={handleImageChange} bind:this={imageInput} accept="image/*" class="hidden" />
+     <input type="file" onchange={handleVideoChange} bind:this={videoInput} accept="video/*" class="hidden" />
+     <input type="file" bind:this={documentInput} onchange={handleDocumentChange} accept=".pdf,.doc,.docx,.txt,.zip,.rar,.html,.css,.js,.dart,text/html,text/css,application/javascript" class="hidden"/>
+     <input type="file" onchange={handleCameraCapture} bind:this={cameraInput} accept="image/*,video/" capture="environment" class="hidden" />
+
 
 
     {/if}
     <!-- Attachment Menu -->
     {#if showAttachmentMenu}
     <div class="fixed py-3 bottom-31 z-50 left-5 w-42 rounded-3xl border border-[#202D46] bg-[#0B1220] shadow-[0_20px_60px_rgba(0,0,0,0.45)] text-white flex flex-col"  onclick={(e:any) => e.stopPropagation()}>
-        <button class="py-2.5 px-4 flex items-center gap-3">
+        <button onclick={openCamera}
+        class="py-2.5 px-4 flex items-center gap-3">
             <span class="inline shrink-0 bg-blue-800 p-1 rounded-lg" ><Camera size="19"/></span>
             Camera
         </button>
@@ -1299,7 +1362,8 @@ function handleDocumentChange(event: Event) {
                 
                 <!-- Right Action Group: Stays anchored side-by-side at the bottom-right -->
                 <div class="flex items-center gap-1 shrink-0 mb-0.5">
-                    <button class:hidden={hasSomethingToSend}
+                    <button onclick={openCamera}
+                    class:hidden={hasSomethingToSend}
                     class="text-blue-500 p-1 rounded-full hover:bg-white/5 transition">
                         <Camera size="22"/>
                     </button>
