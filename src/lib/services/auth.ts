@@ -9,6 +9,8 @@ import { audioStore } from '$lib/stores/audio';
 import { usersStore } from '$lib/stores/users';
 import { chatUserStore } from '$lib/stores/chatUser';
 import { ConversationStore, type ConversationState } from '$lib/stores/conversation';
+import { setOnline } from './presence';
+import { loadUserPresence } from './presence';
 
 // Function to register a new user
 export async function registerUser(userInfo: RegisterUser) {
@@ -123,58 +125,83 @@ export async function loadCurrentUser() {
         playbackSpeed: playbackSpeed ?? 1
     }));
 
-    // Update online status
-    await updateDoc(userRef, {
-        online: true,
-        updatedAt: serverTimestamp()
-    });
+   // Check if userPresence document exists
+    const presenceRef = doc(db, "userPresence", currentUser.uid);
+    const presenceSnap = await getDoc(presenceRef);
 
-    return userInfo;
-}
+    // Create it only if it doesn't exist
+    if (!presenceSnap.exists()) {
+        await setDoc(presenceRef, {
+            uid: currentUser.uid,
 
-//getting all users from fire base
-export async function loadUsers() {
+            online: true,
 
-    const currentUser = auth.currentUser;
+            lastSeen: null,
 
-    if (!currentUser) {
-        return;
+            typing: false,
+
+            recording: false,
+
+            currentConversationId: null,
+
+            createdAt: serverTimestamp(),
+
+            updatedAt: serverTimestamp()
+        });
     }
 
-    // Start loading
-    usersStore.update((state) => ({
-        ...state,
-        loading: true
-    }));
+    // User is online
+    await setOnline();
 
-    // Get all users
-    const snapshot = await getDocs(collection(db, 'users'));
-
-    const users = snapshot.docs
-        .map(doc => doc.data() as UserState)
-        .filter(user => user.uid !== currentUser.uid);
-
-    // Save to store
-    usersStore.set({
-        users,
-        loading: false  
-    });
-}
-
-//getting chat user data function
-export async function loadChatUser(uid: string) {
-
-    const userRef = doc(db, 'users', uid);
-
-    const userSnap = await getDoc(userRef);
-
-    if (!userSnap.exists()) {
-        throw new Error('Chat user not found.');
+        return userInfo;
     }
+
+    //getting all users from fire base
+    export async function loadUsers() {
+
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+            return;
+        }
+
+        // Start loading
+        usersStore.update((state) => ({
+            ...state,
+            loading: true
+        }));
+
+        // Get all users
+        const snapshot = await getDocs(collection(db, 'users'));
+
+        const users = snapshot.docs
+            .map(doc => doc.data() as UserState)
+            .filter(user => user.uid !== currentUser.uid);
+
+        // Save to store
+        usersStore.set({
+            users,
+            loading: false  
+        });
+    }
+
+    //getting chat user data function
+    export async function loadChatUser(uid: string) {
+
+        const userRef = doc(db, 'users', uid);
+
+        const userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) {
+            throw new Error('Chat user not found.');
+        }
 
     const userData = userSnap.data() as UserState;
 
     chatUserStore.set(userData);
+
+    //start listening to this user's presence
+    loadUserPresence(uid);
 
     return userData;
 }

@@ -8,8 +8,12 @@ import {
     query,
     where,
     orderBy,
-    onSnapshot
+    onSnapshot,
+    doc,
+    updateDoc,
+    serverTimestamp
 } from "firebase/firestore";
+import { auth } from "$lib/firebase/firebase";
 
 export function loadMessages(conversationId: string) {
 
@@ -27,6 +31,8 @@ export function loadMessages(conversationId: string) {
         })) as MessageState[];
 
         messagesStore.set(messages);
+
+        
 
     });
 

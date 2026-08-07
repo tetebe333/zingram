@@ -1,5 +1,5 @@
 import { db, auth } from '$lib/firebase/firebase';
-import { doc, getDoc, collection, addDoc, updateDoc, serverTimestamp  } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, updateDoc, serverTimestamp, deleteField, where, query, getDocs } from 'firebase/firestore';
 import { ConversationStore, type ConversationState } from '$lib/stores/conversation';
 
 
@@ -26,10 +26,12 @@ export async function loadConversation(id:string){
 
     return conversation;
 }
+
+
 export async function sendMessage(
     conversationId: string,
     text: string | null,
-    type: "text" | "image" | "video" | "audio" | "document" = "text",
+    type: "text" | "image" | "video" | "audio" | "document" | "deleted" = "text",
     fileUrl: string | null = null,
     duration: number | null = null
 ) {
@@ -49,7 +51,9 @@ export async function sendMessage(
             text,
             fileUrl,
             duration,
-            createdAt: serverTimestamp()
+            createdAt: serverTimestamp(),
+            editedAt: null,
+            deletedAt: null,
         }
     );
 
@@ -70,4 +74,49 @@ export async function sendMessage(
             updatedAt: serverTimestamp()
         }
     );
+}
+
+export async function editMessage(
+    messageId:string,
+    newText:string
+){
+
+    await updateDoc(
+        doc(db,"messages",messageId),
+        {
+            text:newText,
+            editedAt:serverTimestamp()
+        }
+    );
+
+}
+
+export async function deleteMessage(messageId: string) {
+
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+        throw new Error("No authenticated user");
+    }
+
+
+    const messageRef = doc(
+        db,
+        "messages",
+        messageId
+    );
+
+
+    await updateDoc(messageRef, {
+
+        type: "deleted",
+
+        text: "This message was deleted",
+
+        fileUrl: null,
+
+        deletedAt: serverTimestamp()
+
+    });
+
 }

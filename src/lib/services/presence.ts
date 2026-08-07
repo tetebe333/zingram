@@ -1,0 +1,129 @@
+import { auth, db } from '$lib/firebase/firebase';
+import {
+  doc,
+  updateDoc,
+  serverTimestamp, onSnapshot
+} from 'firebase/firestore';
+import { presenceStore } from '$lib/stores/presence';
+import { presenceMapStore } from "$lib/stores/presenceUsers";
+
+
+
+export async function setOnline() {
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) return;
+
+    await updateDoc(
+        doc(db, 'userPresence', currentUser.uid),
+        {
+            online: true,
+            lastSeen: serverTimestamp()
+        }
+    );
+}
+
+export async function setOffline() {
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) return;
+
+    await updateDoc(
+        doc(db, 'userPresence', currentUser.uid),
+        {
+            online: false,
+            lastSeen: serverTimestamp()
+        }
+    );
+}
+
+export async function setTyping(isTyping: boolean) {
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) return;
+
+    await updateDoc(
+        doc(db, 'userPresence', currentUser.uid),
+        {
+            typing: isTyping
+        }
+    );
+}
+
+export async function setRecording(isRecording: boolean) {
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) return;
+
+    await updateDoc(
+        doc(db, 'userPresence', currentUser.uid),
+        {
+            recording: isRecording
+        }
+    );
+}
+
+export async function updateLastSeen() {
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) return;
+
+    await updateDoc(
+        doc(db, 'userPresence', currentUser.uid),
+        {
+            lastSeen: serverTimestamp()
+        }
+    );
+}
+
+export function loadUserPresence(uid: string) {
+    const presenceRef = doc(db, 'userPresence', uid);
+
+    return onSnapshot(presenceRef, (snapshot) => {
+        if (!snapshot.exists()) return;
+
+        const data = snapshot.data();
+
+        presenceStore.set({
+            ...data,
+            lastSeen: data.lastSeen?.toDate?.() ?? null
+        } as any);
+    });
+}
+
+
+export function loadUsersPresence(uids: string[]) {
+    const unsubscribers: (() => void)[] = [];
+
+    for (const uid of uids) {
+
+        const unsubscribe = onSnapshot(
+            doc(db, "userPresence", uid),
+            (snapshot) => {
+
+                if (!snapshot.exists()) return;
+
+                const data = snapshot.data();
+
+                presenceMapStore.update((current) => ({
+                    ...current,
+                    [uid]: {
+                        online: data.online ?? false,
+                        typing: data.typing ?? false,
+                        recording: data.recording ?? false,
+                        currentConversationId:
+                            data.currentConversationId ?? null,
+                        lastSeen:
+                            data.lastSeen?.toDate?.() ?? null
+                    }
+                }));
+            }
+        );
+
+        unsubscribers.push(unsubscribe);
+    }
+
+    return () => {
+        unsubscribers.forEach((unsub) => unsub());
+    };
+}

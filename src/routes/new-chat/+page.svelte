@@ -2,15 +2,33 @@
     import { 
 ChevronLeft, Search, MessageSquare, Plus 
 } from 'lucide-svelte';
-import { onMount } from 'svelte';
+import { onMount, onDestroy, tick } from 'svelte';
 import { loadUsers } from '$lib/services/auth';
 import { usersStore } from '$lib/stores/users';
 import {goto} from '$app/navigation';
 import { type UserState } from '$lib/stores/user';
 import { findOrCreateConversation } from '$lib/services/auth';
+import { setOnline } from '$lib/services/presence';
+import { loadUsersPresence } from "$lib/services/presence";
+import { presenceMapStore } from '$lib/stores/presenceUsers';
+
+let unsubscribePresenceMap: (() => void) | undefined;
+
 onMount(async () => {
     await loadUsers();
-})
+    await tick();
+    setOnline();
+
+    const users = $usersStore.users;
+
+    unsubscribePresenceMap = loadUsersPresence(
+        users.map((u) => u.uid)
+    );
+});
+
+onDestroy(() => {
+    unsubscribePresenceMap?.();
+});
 
 async function startChat(uid:string) {
     const conversation = await findOrCreateConversation(uid);
@@ -36,6 +54,28 @@ let showContextMenu = $state(false);
 function openContextMenu(user: UserState){
     selectedUser = user;
     showContextMenu = true;
+}
+
+let longPressTimer: ReturnType<typeof setTimeout> | undefined;
+let longPressTriggered = false;
+
+function startLongPress(event: TouchEvent, user: UserState) {
+    longPressTriggered = false;
+
+    longPressTimer = setTimeout(() => {
+        longPressTriggered = true;
+
+        event.preventDefault();
+
+        openContextMenu(user);
+    }, 500);
+}
+
+function cancelLongPress() {
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = undefined;
+    }
 }
 </script>
 
@@ -68,15 +108,25 @@ function openContextMenu(user: UserState){
             <p class="text-gray-400 mt-50 text-center">loading Users...</p>
         {:else}
             {#each filteredUsers as user}
-                <a href="/" 
+                <a
+                    href="/"
                     onclick={(e)=>{
+                        if (longPressTriggered) {
+                            e.preventDefault();
+                            return;
+                        }
+
                         e.preventDefault();
-                        startChat(user.uid);            
+                        startChat(user.uid);
                     }}
                     oncontextmenu={(e)=>{
                         e.preventDefault();
-                        openContextMenu(user)
+                        openContextMenu(user);
                     }}
+                    ontouchstart={(e) => startLongPress(e, user)}
+                    ontouchend={cancelLongPress}
+                    ontouchmove={cancelLongPress}
+                    ontouchcancel={cancelLongPress}
                 >
                     <div class="mt-5 flex justify-between border-b border-b-white/5 pb-2">
                         <div class="flex gap-3 relative">
@@ -85,7 +135,7 @@ function openContextMenu(user: UserState){
                                 <p class="text-sm font-semibold text-gray-400">{user.fullName}</p>
                                 <p class="text-xs font-semibold text-gray-500">{user.username}</p>
                             </div>
-                            {#if user.online}
+                            {#if $presenceMapStore[user.uid]?.online}
                             <div class="h-3 w-3 bg-green-500 rounded-full absolute top-8 left-9"></div>
                             {/if}
                         </div>
@@ -97,8 +147,9 @@ function openContextMenu(user: UserState){
             {/each}
 
             {#if showContextMenu && selectedUser}
+                  <div class="fixed inset-0 z-45 w-full h-full bg-black/30 backdrop-blur-sm"></div>
                 <div
-                    class="fixed bottom-10 left-5 w-52 rounded-2xl border border-[#202D46] bg-[#0B1220] text-white shadow-xl"
+                    class="fixed z-50 bottom-10 left-5 w-52 rounded-2xl border border-[#202D46] bg-[#0B1220] text-white shadow-xl"
                     onclick={(e) => e.stopPropagation()}
                 >
 

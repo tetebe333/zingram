@@ -3,25 +3,29 @@
 let messageContainer: HTMLDivElement;
 import { 
 ArrowLeft ,
-MessageCircleMore, Plus, Camera, Mic , Image , Video, FileText, Send, X, Trash2,Square , Play,
+MessageCircleMore, ChevronDown, Plus, Ban, SquarePen, Camera, Mic , Image , Video, FileText, Send, X, Trash2,Square , Play,
 
 ToyBrick
 
 } from 'lucide-svelte';
 import { page }  from '$app/state' 
 import {onMount, onDestroy, tick}  from 'svelte'
-import { loadConversation, sendMessage} from '$lib/services/chat'
+import { loadConversation, sendMessage, deleteMessage, editMessage} from '$lib/services/chat'
 import {chatUserStore} from '$lib/stores/chatUser'
 import { auth } from '$lib/firebase/firebase';
 import { loadChatUser } from '$lib/services/auth';
 import { loadMessages } from '$lib/services/messages';
 import { messagesStore } from '$lib/stores/messages';
 import { userStore } from '$lib/stores/user';
-  import { uploadAudio, uploadImage, uploadVideo, uploadDocument} from '$lib/services/cloudinary';
+import { uploadAudio, uploadImage, uploadVideo, uploadDocument} from '$lib/services/cloudinary';
+import { presenceStore } from '$lib/stores/presence';
+import { loadUserPresence, setTyping, setRecording, setOnline } from '$lib/services/presence';
+import { formatLastSeen } from '$lib/utils/lastSeen';
 let loadingProfile = $state(false);
 let unsubscribe: (() => void) | undefined
+let unsubscribePresence: (() => void) | undefined
 
-const conversationId: any = $derived(page.params.conversationId);
+const conversationId = $derived(page.params.conversationId as string);
 
 function scrollToBottom() {
     if (!messageContainer) return;
@@ -33,16 +37,39 @@ function scrollToBottom() {
     
 }
 
-$effect(() =>{
-    $messagesStore;
+$effect(() => {
+    let previousMessageCount = 0;
 
-    tick().then(()=> {
-        scrollToBottom();
-    })
-})
+    $effect(() => {
+        const messages = $messagesStore;
 
-onMount(async ()=> {
-    loadingProfile = true;
+        if (messages.length > previousMessageCount) {
+
+            tick().then(() => {
+
+                if (isAtBottom) {
+
+                    requestAnimationFrame(() => {
+                        scrollToBottom();
+                    });
+
+                } else {
+
+                    showScrollToBottom = true;
+
+                }
+
+            });
+
+        }
+
+        previousMessageCount = messages.length;
+    });
+});
+
+onMount(async ()=> {                
+  loadingProfile = true;
+  setOnline()
    const conversation = await loadConversation(conversationId);
 
    //load all message
@@ -56,7 +83,11 @@ onMount(async ()=> {
     );
 
     if (otherUserUid) {
+        //load other ser profile
         await loadChatUser(otherUserUid);
+
+        //Start listening to their presence
+        unsubscribePresence = loadUserPresence(otherUserUid);
     }
     loadingProfile = false;
 
@@ -67,6 +98,8 @@ onMount(async ()=> {
 onDestroy(() => {
     // Stop Firestore listener
     unsubscribe?.();
+    //stop presence listener
+    unsubscribePresence?.();
 
     // Stop message audio completely
     if (messageAudio) {
@@ -127,7 +160,7 @@ let messagePlaybackSpeed = $state(1);
 //recording lets
 let mediaRecorder: MediaRecorder;
 let audioChunks: Blob[] = [];
-let inputMode = $state<'normal' | 'recording' |'preview'>('normal');
+let inputMode = $state<'normal' | 'recording' |'preview' | 'editing' >('normal');
 
 //video lets
 //svelte-ignore non_reactive_update
@@ -177,22 +210,55 @@ const hasSomethingToSend = $derived(
     selectedDocument !== null
 );
 
+//istyping let
+let typingTimeout: ReturnType<typeof setTimeout> | undefined;
+let isTyping = $state(false);
+
+//message menu
+let showMessageMenu = $state(false);
+let selectedMessage = $state<any>(null);
+
+let menuX = $state(0);
+let menuY = $state(0);
 
 
+//long prss sting
+let longPressTimer: ReturnType<typeof setTimeout> | undefined;
+let longPressTriggered = false;
+
+//scrow down let
+let showScrollToBottom = $state(false);
+let isAtBottom = $state(true);
+
+//edit state
+let editingMessage = $state<any | null>(null);
+let originalEditingText = $state('');
+let editingMessageText = $state('');
+let discardEdit = $state(false);
 // Automatically grow the textarea to fit long text up to a maximum height
   function autoGrow() {
     if (!textareaRef) return;
 
-    // Reset height to calculate accurately
-    textareaRef.style.height = 'auto';
-    
-    // Calculate new height based on scroll bounds (max out at 160px)
-    const newHeight = Math.min(textareaRef.scrollHeight, 160);
+    textareaRef.style.height = '0px';
+
+    const newHeight = Math.max(24, Math.min(textareaRef.scrollHeight, 160));
+
     textareaRef.style.height = `${newHeight}px`;
   }
 
+  async function resetTextarea() {
+    messageText = '';
+
+    await tick();
+    
+
+    if (textareaRef) {
+        textareaRef.style.height = '24px'; // your normal one-line height
+    }
+}
   async function handleSendMessage() {
     sendingMessage = true;
+    scrollToBottom()
     try {
 
         // IMAGE MESSAGE
@@ -225,9 +291,10 @@ const hasSomethingToSend = $derived(
                     imageInput.value = '';
                 }
 
+                await tick()
+                scrollToBottom()
                 // Clear caption
-                messageText = '';
-                autoGrow();
+               resetTextarea()
 
             } catch (error) {
                 console.error("❌ Image upload failed:", error);
@@ -253,7 +320,6 @@ const hasSomethingToSend = $derived(
                     "video",
                     fileUrl
                 );
-
                 // Clear preview
                 if (videoPreviewUrl) {
                     URL.revokeObjectURL(videoPreviewUrl);
@@ -267,9 +333,10 @@ const hasSomethingToSend = $derived(
                     videoInput.value = "";
                 }
 
+                await tick()
+                scrollToBottom()
                 // Clear caption
-                messageText = "";
-                autoGrow();
+               resetTextarea()
 
             } catch (error) {
 
@@ -294,7 +361,6 @@ const hasSomethingToSend = $derived(
                     "document",
                     fileUrl
                 );
-
                 // Clear document preview
                 selectedDocument = null;
                 documentName = "";
@@ -305,9 +371,12 @@ const hasSomethingToSend = $derived(
                     documentInput.value = "";
                 }
 
+                 
+
+                await tick()
+                scrollToBottom()
                 // Clear caption
-                messageText = "";
-                autoGrow();
+                resetTextarea()
 
             } catch (error) {
 
@@ -327,8 +396,9 @@ const hasSomethingToSend = $derived(
             messageText
         );
 
-        messageText = '';
-        autoGrow();
+        await tick()
+        scrollToBottom()
+       resetTextarea()
     }finally{
         sendingMessage = false;
     }
@@ -338,50 +408,71 @@ const hasSomethingToSend = $derived(
   async function startRecording() {
     previewProgress = 0;
     previewCurrentTime = 0;
-    isPlayingPreview = false
+    isPlayingPreview = false;
     recordingSecond = 0;
     recordedDuration = null;
-    //ask for adio permission
-    const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true
-    });
 
-    audioChunks = [];
-
-    mediaRecorder = new MediaRecorder(stream);
-
-    mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-            audioChunks.push(event.data);
-        }
-    };
-
-    mediaRecorder.onstart = () => {
-        inputMode = 'recording'
-    };
-
-    mediaRecorder.onstop = () => {
-        inputMode = 'preview'
-
-        stream.getTracks().forEach(track => track.stop());
-
-        audioBlob = new Blob(audioChunks, {
-            type: mediaRecorder.mimeType
+    try {
+        // Ask for microphone permission
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true
         });
 
-        audioUrl = URL.createObjectURL(audioBlob);
+        // ✅ User granted permission
+        await setRecording(true);
 
-        console.log("🎙️ Recording finished:", audioBlob);
-    };
+        audioChunks = [];
 
-    mediaRecorder.start();
-    recordingTimer = setInterval(() => {
-        recordingSecond +=1;
-    }, 1000);
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstart = () => {
+            inputMode = 'recording';
+        };
+
+        mediaRecorder.onstop = async () => {
+            inputMode = 'preview';
+
+            // Stop microphone
+            stream.getTracks().forEach(track => track.stop());
+
+            // User is no longer recording
+            await setRecording(false);
+
+            audioBlob = new Blob(audioChunks, {
+                type: mediaRecorder.mimeType
+            });
+
+            audioUrl = URL.createObjectURL(audioBlob);
+
+            console.log("🎙️ Recording finished:", audioBlob);
+        };
+
+        mediaRecorder.start();
+
+        recordingTimer = setInterval(() => {
+            recordingSecond += 1;
+        }, 1000);
+
+    } catch (error) {
+        console.log("🎙️ Microphone permission denied", error);
+
+        alert(
+            'Microphone permission is block. please enable it in your browser settings and try again.'
+        )
+
+        // Just to be safe
+        await setRecording(false);
+    }
 }
 
-
-function stopRecording() {
+async function stopRecording() {
+    await setRecording(false);
     mediaRecorder?.stop();
 
     if (recordingTimer) {
@@ -392,7 +483,8 @@ function stopRecording() {
     recordedDuration = recordingSecond;
 }
 
-function deletRecording() {
+async function deletRecording() {
+    await setRecording(false);
     // Stop timer
     if (recordingTimer) {
         clearInterval(recordingTimer);
@@ -434,6 +526,8 @@ function deletRecording() {
 }
 
 async function sendRecording() {
+    scrollToBottom();
+    await setRecording(false);
 
     if(!audioBlob) return;
     if (recordedDuration === null) return
@@ -468,6 +562,8 @@ async function sendRecording() {
             recordedDuration
         );
 
+        await tick()
+        scrollToBottom()
         //clear the local recording
         audioBlob = null;
         audioChunks = [];
@@ -479,6 +575,7 @@ async function sendRecording() {
 
     } catch (error){
         console.log('❌ Audio upload failed :', error);
+        alert('❌ Audio upload failed, Try again');
     }
     
     
@@ -801,7 +898,183 @@ function handleCameraCapture(event: Event) {
 
 }
 
+async function handleTyping() {
 
+    // tell firebase we are typing
+    await setTyping(true);
+
+    // reset the timer every key press
+    if (typingTimeout) {
+        clearTimeout(typingTimeout);
+    }
+
+    // after 2 seconds of no typing
+    typingTimeout = setTimeout(async () => {
+
+        await setTyping(false);
+
+    }, 2000);
+
+}
+
+function openMessageMenu(event: MouseEvent, message: any) {
+    event.preventDefault();
+
+    selectedMessage = message;
+
+    const menuWidth = 168;   // w-42 = 10.5rem = 168px
+    const menuHeight = 110;  // Approximate height of 2 buttons
+    const padding = 12;
+
+    let x = event.clientX;
+    let y = event.clientY;
+
+    // Right edge
+    if (x + menuWidth > window.innerWidth - padding) {
+        x = window.innerWidth - menuWidth - padding;
+    }
+
+    // Bottom edge
+    if (y + menuHeight > window.innerHeight - padding) {
+        y = window.innerHeight - menuHeight - padding;
+    }
+
+    // Left edge
+    if (x < padding) {
+        x = padding;
+    }
+
+    // Top edge
+    if (y < padding) {
+        y = padding;
+    }
+
+    menuX = x;
+    menuY = y;
+
+    showMessageMenu = true;
+}
+function closeMessageMenu() {
+    showMessageMenu = false;
+    selectedMessage = null;
+}
+
+function canEditMessage(message: any) {
+    // Deleted messages can never be edited
+    if (message.type === "deleted") return false;
+
+    if (!message.createdAt) return false;
+
+    const createdAt = message.createdAt.toDate().getTime();
+    const now = Date.now();
+
+    const hours24 = 24 * 60 * 60 * 1000;
+    return (now - createdAt) < hours24;
+}
+
+function checkIfAtBottom() {
+    if (!messageContainer) return;
+
+    const threshold = 80;
+
+    isAtBottom =
+        messageContainer.scrollHeight -
+        messageContainer.scrollTop -
+        messageContainer.clientHeight <
+        threshold;
+
+    if (isAtBottom) {
+        showScrollToBottom = false;
+    }
+}
+
+function startEditMessage(message: any) {
+
+    if (!message) return;
+
+    editingMessage = message;
+
+    originalEditingText = message.text ?? "";
+
+    editingMessageText = message.text ?? "";
+
+    inputMode = "editing";
+
+    closeMessageMenu();
+
+    tick().then(() => {
+        autoGrow();
+        textareaRef?.focus();
+    });
+}
+
+function cancelEdit() {
+
+    editingMessage = null;
+    originalEditingText = "";
+    editingMessageText = "";
+    inputMode = "normal";
+    discardEdit = false
+    resetTextarea();
+}
+
+async function handleUpdateMessage() {
+    if (!editingMessage) return;
+
+    const newText = editingMessageText.trim();
+
+    if (!newText) return;
+
+    if (newText === editingMessage.text) {
+       cancelEdit()
+       return
+    }
+
+    try {
+        inputMode = "normal";
+        await editMessage(
+            editingMessage.id,
+            newText
+        );
+       cancelEdit()
+    } catch (error) {
+        console.error("❌ Failed to update message:", error);
+        alert("❌ Failed to update message, try again")
+    } finally{
+        cancelEdit()
+    }
+}
+
+function startLongPress(event: TouchEvent, message: any) {
+    longPressTriggered = false;
+
+    longPressTimer = setTimeout(() => {
+        longPressTriggered = true;
+
+        // Prevent browser context menu
+        event.preventDefault();
+
+        const touch = event.touches[0] || event.changedTouches[0];
+        if (!touch) return;
+
+        // Reuse your existing menu
+        openMessageMenu(
+            {
+                preventDefault: () => {},
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            } as MouseEvent,
+            message
+        );
+    }, 500);
+}
+
+function cancelLongPress() {
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = undefined;
+    }
+}
 
 
 </script>
@@ -812,7 +1085,10 @@ function handleCameraCapture(event: Event) {
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="relative" onclick={()=> showAttachmentMenu = false}>
+<div class="relative" onclick={()=> {
+    showAttachmentMenu = false;
+    closeMessageMenu();
+}}>
     <div class="pt-6 fixed z-40 w-full justify-between border-b border-b-white/5 pb-2 bg-[#010713] flex px-4">
 
         {#if loadingProfile}
@@ -826,15 +1102,30 @@ function handleCameraCapture(event: Event) {
             <div>
                 <p class="text-sm font-semibold text-gray-300">{$chatUserStore?.fullName}</p>
                 <p class="text-xs font-semibold text-gray-500">{$chatUserStore?.username}</p>
-                {#if $chatUserStore?.online}
-                <p class="text-xs font-semibold text-green-500">online</p>
+                {#if $presenceStore.typing}
+                    <p class="text-xs font-semibold text-blue-500">
+                        Typing...
+                    </p>
+
+                {:else if $presenceStore.recording}
+                    <p class="text-xs font-semibold text-red-500">
+                        Recording...
+                    </p>
+
+                {:else if $presenceStore.online}
+                    <p class="text-xs font-semibold text-green-500">
+                        Online
+                    </p>
+
                 {:else}
-                <p class="text-xs font-semibold text-gray-500">Last seen today at 2:35 AM</p>
+                    <p class="text-xs font-semibold text-gray-500">
+                        {formatLastSeen($presenceStore.lastSeen)}
+                    </p>
                 {/if}
 
             </div>
-            {#if $chatUserStore?.online}
-            <div class="h-3 w-3 bg-green-500 rounded-full absolute top-15 left-22"></div>
+            {#if $presenceStore?.online}
+             <div class="h-3 w-3 bg-green-500 rounded-full absolute top-15 left-22"></div>
             {/if}
         </div>
         {/if}
@@ -854,6 +1145,7 @@ function handleCameraCapture(event: Event) {
         </div>
     {:else} 
   <div
+    onscroll={checkIfAtBottom}
     bind:this={messageContainer}
     class="fixed top-0 bottom-0 left-0 py-25 px-4 right-0 overflow-y-auto
     [&::-webkit-scrollbar]:hidden
@@ -867,11 +1159,27 @@ function handleCameraCapture(event: Event) {
                 <!-- MY MESSAGE -->
                 <div class="flex justify-end mb-3 w-full min-w-0">
 
-                    <div
+                    <div 
+                    ontouchstart={(e)=> startLongPress(e, message)}
+                    ontouchend={cancelLongPress}
+                    ontouchcancel={cancelLongPress}
+                    ontouchmove={cancelLongPress}
+                    oncontextmenu={(e) => openMessageMenu(e, message)}
                         class="bg-blue-700 px-4 py-2 text-white  rounded-2xl w-fit max-w-[85%] min-w-0 rounded-br-none"
                     >
 
-                        {#if message.type === 'text'}
+                        {#if message.type === 'deleted'}
+
+                            <p class="text-sm -mb-1 italic  opacity-70 flex items-center gap-1">
+
+                                <Ban size='16'/>
+
+                                <i class="fa-solid fa-ban text-xs"></i>
+                                    This message was deleted
+                            </p>
+
+                  
+                        {:else if message.type === 'text'}
 
                             <!-- TEXT -->
                             <p>{message.text}</p>
@@ -900,7 +1208,7 @@ function handleCameraCapture(event: Event) {
                                     {/if}
                                 </p>
 
-                                <div class="flex items-center gap-[2px] flex-1 min-w-0 overflow-hidden">
+                                <div class="flex items-center gap-0.5 flex-1 min-w-0 overflow-hidden">
                                     {#each sdbars as bar, i}
                                         <div
                                             class={`w-0.5 shrink-0 rounded-full ${
@@ -991,23 +1299,41 @@ function handleCameraCapture(event: Event) {
 
                             </a>
 
-                            {#if message.text}
+                             {#if message.text}
                                 <p class="text-sm wrap-break-word mt-2">
                                     {message.text}
                                 </p>
                             {/if}
 
+                            
+                        
                         {/if}
+                       
 
                         
 
-                        <p class="text-[10px] mt-1 text-right opacity-70">
-                            {message.createdAt?.toDate().toLocaleTimeString([], {
-                                hour: "numeric",
-                                minute: "2-digit"
-                            })}
-                        </p>
+                        
+                            <div
+                                class:justify-between={message.editedAt && message.type !== 'deleted'}
+                                class:justify-end={!message.editedAt || message.type === 'deleted'}
+                                class="flex items-center gap-1"
+                            >
 
+                                {#if message.editedAt && message.type !== 'deleted'}
+                                    <p class="text-[10px] mt-1 opacity-70 italic">
+                                        edited
+                                    </p>
+                                {/if}
+
+                                <p class="text-[10px] mt-1 opacity-70">
+                                    {message.createdAt?.toDate().toLocaleTimeString([], {
+                                        hour: "numeric",
+                                        minute: "2-digit"
+                                    })}
+                                </p>
+
+                            </div>
+                        
                     </div>
 
                 </div>
@@ -1021,7 +1347,18 @@ function handleCameraCapture(event: Event) {
                         class="bg-[#1F2937] text-white px-4 py-2 rounded-2xl w-fit max-w-[85%] min-w-0 rounded-bl-none"
                     >
 
-                        {#if message.type === 'text'}
+
+                         {#if message.type === 'deleted'}
+
+                            <p class="text-sm mt-2 italic opacity-70 flex items-center gap-1">
+
+                                <Ban size='16'/>
+
+                                <i class="fa-solid fa-ban text-xs"></i>
+                                    This message was deleted
+                            </p>
+
+                        {:else if message.type === 'text'}
 
                             <!-- TEXT -->
                             <p>{message.text}</p>
@@ -1050,7 +1387,7 @@ function handleCameraCapture(event: Event) {
                                     {/if}
                                 </p>
 
-                                <div class="flex items-center gap-[2px] flex-1 min-w-0 overflow-hidden">
+                                <div class="flex items-center gap-0.5 flex-1 min-w-0 overflow-hidden">
                                     {#each sdbars as bar, i}
                                         <div
                                             class={`w-0.5 shrink-0 rounded-full ${
@@ -1149,12 +1486,26 @@ function handleCameraCapture(event: Event) {
 
                         {/if}
 
-                         <p class="text-[10px] mt-1 text-right opacity-70">
-                            {message.createdAt?.toDate().toLocaleTimeString([], {
-                                hour: "numeric",
-                                minute: "2-digit"
-                            })}
-                        </p>
+                        <div
+                        class:justify-between={message.editedAt && message.type !== 'deleted'}
+                        class:justify-end={!message.editedAt || message.type === 'deleted'}
+                        class="flex items-center gap-1"
+                        >
+
+                            {#if message.editedAt && message.type !== 'deleted'}
+                                <p class="text-[10px] mt-1 opacity-70 italic">
+                                    edited
+                                </p>
+                            {/if}
+
+                            <p class="text-[10px] mt-1 opacity-70">
+                                {message.createdAt?.toDate().toLocaleTimeString([], {
+                                    hour: "numeric",
+                                    minute: "2-digit"
+                                })}
+                            </p>
+
+                        </div>
 
                     </div>
 
@@ -1163,7 +1514,7 @@ function handleCameraCapture(event: Event) {
             {/if}
 
         {/each}
-</div>
+    </div>
             
     {/if} 
 
@@ -1335,8 +1686,7 @@ function handleCameraCapture(event: Event) {
     
 
     {#if inputMode === 'normal'}
-        <!-- we will do video preview here later -->
-        <!-- we will do doc preview here later -->
+      
         <div class="fixed  w-full bottom-10 z-10 left-0">
         <!-- 
             1. items-end keeps icons locked to the bottom without stretching vertically
@@ -1345,7 +1695,8 @@ function handleCameraCapture(event: Event) {
             <div class="flex items-end justify-between bg-slate-900/60 border border-white/10 backdrop-blur-xl mx-5 py-3 px-3 rounded-2xl gap-2">
             
                 <!-- Plus Button: Remains static at the bottom-left -->
-                <button onclick={(e)=> { e.stopPropagation(); showAttachmentMenu = !showAttachmentMenu}} class="w-8 h-8 flex items-center justify-center border-2 border-blue-600 text-blue-500 rounded-full shrink-0 mb-05">
+                <button 
+                onclick={(e)=> { e.stopPropagation(); showAttachmentMenu = !showAttachmentMenu}} class="w-8 h-8 flex items-center justify-center border-2 border-blue-600 text-blue-500 rounded-full shrink-0 mb-05">
                     <Plus size="20"/>
                 </button>
 
@@ -1354,7 +1705,10 @@ function handleCameraCapture(event: Event) {
                 <textarea 
                 bind:this={textareaRef}
                 bind:value={messageText}
-                oninput={autoGrow}
+                oninput={()=> {
+                    autoGrow();
+                    handleTyping();
+                }}
                 rows="1"
                 placeholder="Type a message..."
                 class="w-full bg-transparent text-gray-200 outline-none resize-none px-2 py-1 max-h-40 text-sm overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] scrollbar-none"
@@ -1393,8 +1747,58 @@ function handleCameraCapture(event: Event) {
             </div>
 
         </div>
+        
+    {:else if inputMode === 'editing'}
+      <div onclick={(e:any) => e.stopPropagation()} 
+      class="fixed  w-full bottom-10 z-50 left-0">
 
+            <div onclick={()=>{
+                if (editingMessageText == originalEditingText) {
+                    cancelEdit()
+                }else{
+                discardEdit = true
+                }
+            }}
+            class="flex justify-end mx-5 mb-2">
+                <div class="bg-slate-900/90 border border-white/10  px-4 py-2 text-white  rounded-2xl w-fit max-w-[85%] min-w-0 rounded-br-none ">
+                    <p>{originalEditingText}</p>
+                </div>
+            </div>
+         
+            <div class="flex items-end justify-between bg-slate-900/60 border border-white/10 backdrop-blur-xl mx-5 py-3 px-3 rounded-2xl gap-2  ">
+            
+                <!-- Plus Button: Remains static at the bottom-left -->
+                <button onclick={cancelEdit} class="w-8 h-8 flex items-center justify-center border-2 border-blue-600 text-blue-500 rounded-full shrink-0 mb-05">
+                    <X size="20"/>
+                </button>
 
+                
+                <!-- Textarea: Auto-grows dynamically, hides static scrollbars, handles internal scrolling perfectly  -->
+                <textarea 
+                bind:value={editingMessageText}
+                oninput={()=> {
+                    autoGrow();
+                }}
+                rows="1"
+                placeholder="Type a message..."
+                class="w-full bg-transparent text-gray-200 outline-none resize-none px-2 py-1 max-h-40 text-sm overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] scrollbar-none"
+                ></textarea>
+                
+                <!-- Right Action Group: Stays anchored side-by-side at the bottom-right -->
+                <div class="flex items-center gap-1 shrink-0 mb-0.5">
+                
+                    <button onclick={handleUpdateMessage}
+                    class:bg-gray-300={editingMessageText.trim() === ''}
+                    class="text-white bg-blue-700  px-2 py-1 rounded-lg">
+
+                        <Send class="inline" size="18"/>
+                        update                          
+                    </button>
+
+                </div>
+            </div>
+
+         </div>  
 
 
     {:else if inputMode === 'recording'}
@@ -1513,13 +1917,100 @@ function handleCameraCapture(event: Event) {
          </div>
     {/if}
 
+    {#if showMessageMenu}
+        <div
+            onclick={(e) => e.stopPropagation()}
+            class="fixed z-50 w-42 rounded-2xl border border-[#202D46] bg-[#0B1220] text-white shadow-xl overflow-hidden"
+            style="left:{menuX}px; top:{menuY}px;"
+        >
 
-    
+           {#if selectedMessage?.type === "deleted"}
+
+                <div class="px-4 py-4 text-center text-sm text-gray-400 italic">
+                    This message has already been deleted.
+                </div>
+
+            {:else}
+
+                {#if canEditMessage(selectedMessage) && selectedMessage?.text !== null}
+                    <button onclick={()=>startEditMessage(selectedMessage)}
+                        class="w-full px-4 py-3 hover:bg-white/5 transition flex items-center gap-2"
+                    >
+                        <SquarePen size="17" />
+                        <span>Edit</span>
+                    </button>
+                {/if}
+
+               <button
+                    onclick={async () => {
+                        if (!selectedMessage) return;
+                        await deleteMessage(selectedMessage.id);
+                        closeMessageMenu();
+                    }}
+                    class="w-full px-4 py-3 hover:bg-white/5 transition text-red-400 flex items-center gap-2"
+                >
+                    <Trash2 size="17" />
+                    <span>Delete</span>
+                </button>
+
+            {/if}
+
+        </div>
+    {/if}
+
+     {#if showMessageMenu}
+       <div class="fixed inset-0 z-45 w-full h-full bg-black/30 backdrop-blur-sm"></div>
+    {/if}
    
 
-    
-    
+    <!-- show new message arrow -->
+    {#if showScrollToBottom}
+        <button onclick={()=>{
+            scrollToBottom();
+        }}
+        class="bg-gray-700 text-white fixed bottom-27 right-6 rounded-full p-2"
+        >
+            <ChevronDown size="22"/>
+        </button>
+    {/if}
 
-    
+    {#if inputMode === 'editing'}
+       <div onclick={()=>{
+        if (editingMessageText == originalEditingText) {
+            cancelEdit()
+        }else{
+          discardEdit = true
+        }
+       }}
+       class="fixed inset-0 z-45 w-full h-full bg-black/30 backdrop-blur-sm"></div>
+    {/if}
+
+    {#if discardEdit }
+        <div onclick={(e) => e.stopPropagation()}
+        class="fixed inset-0 z-58 w-full h-full bg-black/30 backdrop-blur-sm"></div>
+        <div
+            onclick={(e) => e.stopPropagation()}
+            class="fixed p-4 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-60 w-60 rounded-2xl border border-[#202D46] bg-[#0B1220] text-white shadow-xl"
+            >
+
+            <p class="text-center mb-4 text-sm">Discard edit?</p>
+            <div class="flex gap-2">
+                <button
+                onclick={()=> discardEdit = false}
+                class="bg-gray-800 font-semibold text-white  bottom-27 right-6 rounded-full px-6 py-2"
+                >
+                Cancle
+                </button>
+
+                <button  onclick={()=> cancelEdit()}
+                class="bg-gray-800 font-semibold text-red-600  bottom-27 right-6 rounded-full px-6 py-2"
+                >
+                Discard
+                </button>
+            </div>
+
+        </div>
+    {/if}
+   
 
 </div>

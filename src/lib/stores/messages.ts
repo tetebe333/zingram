@@ -7,13 +7,15 @@ export interface MessageState {
 
     senderId: string;
 
-    type: "text" | "image" | "video" | "audio" | "document";
+    type: "text" | "image" | "video" | "audio" | "document" | "deleted";
 
     text: string | null;
 
     fileUrl: string | null;
     duration: number| null;
     createdAt: any;
+    editedAt: any;
+    deletedAt: any;
 }
 
 export const messagesStore = writable<MessageState[]>([]);
