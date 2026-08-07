@@ -239,7 +239,7 @@ let discardEdit = $state(false);
   function autoGrow() {
     if (!textareaRef) return;
 
-    textareaRef.style.height = '0px';
+    textareaRef.style.height = 'auto';
 
     const newHeight = Math.max(24, Math.min(textareaRef.scrollHeight, 160));
 
@@ -1775,6 +1775,7 @@ function cancelLongPress() {
                 
                 <!-- Textarea: Auto-grows dynamically, hides static scrollbars, handles internal scrolling perfectly  -->
                 <textarea 
+                bind:this={textareaRef}
                 bind:value={editingMessageText}
                 oninput={()=> {
                     autoGrow();
