@@ -1,7 +1,16 @@
 import { db, auth } from '$lib/firebase/firebase';
 import { doc, getDoc, collection, addDoc, updateDoc, serverTimestamp, deleteField, where, query, getDocs } from 'firebase/firestore';
 import { ConversationStore, type ConversationState } from '$lib/stores/conversation';
+import { onAuthStateChanged, type User } from "firebase/auth";
 
+export function waitForAuth(): Promise<User | null> {
+    return new Promise((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            unsubscribe();
+            resolve(user);
+        });
+    });
+}
 
 
 export async function loadConversation(id:string){
@@ -36,7 +45,7 @@ export async function sendMessage(
     duration: number | null = null
 ) {
 
-    const currentUser = auth.currentUser;
+    const currentUser = await waitForAuth();
 
     if (!currentUser) {
         throw new Error("No authenticated user");
@@ -93,7 +102,7 @@ export async function editMessage(
 
 export async function deleteMessage(messageId: string) {
 
-    const currentUser = auth.currentUser;
+    const currentUser = await waitForAuth();
 
     if (!currentUser) {
         throw new Error("No authenticated user");

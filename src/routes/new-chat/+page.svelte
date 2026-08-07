@@ -12,8 +12,9 @@ import { loadUsersPresence } from "$lib/services/presence";
 import { presenceMapStore } from '$lib/stores/presenceUsers';
 
 let unsubscribePresenceMap: (() => void) | undefined;
-
+let istLoading = $state(false)
 onMount(async () => {
+    istLoading = true
     await loadUsers();
     await tick();
 
@@ -22,6 +23,7 @@ onMount(async () => {
     unsubscribePresenceMap = loadUsersPresence(
         users.map((u) => u.uid)
     );
+    istLoading = false
 });
 
 onDestroy(() => {
@@ -102,8 +104,11 @@ function cancelLongPress() {
     <div class="px-5 pb-5 pt-40">
         <h1 class="text-lg text-gray-300 font-semibold ">All Users</h1>
 
-        {#if $usersStore.loading}
-            <p class="text-gray-400 mt-50 text-center">loading Users...</p>
+        {#if istLoading}
+            <div class="flex mt-50 justify-center items-center gap-2">
+                <div class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
+                <p class="text-gray-400 text-center">loading Users...</p>
+            </div>
         {:else}
             {#each filteredUsers as user}
                 <div

@@ -11,6 +11,16 @@ import { chatUserStore } from '$lib/stores/chatUser';
 import { ConversationStore, type ConversationState } from '$lib/stores/conversation';
 import { setOnline } from './presence';
 import { loadUserPresence } from './presence';
+import { onAuthStateChanged, type User } from "firebase/auth";
+
+export function waitForAuth(): Promise<User | null> {
+    return new Promise((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            unsubscribe();
+            resolve(user);
+        });
+    });
+}
 
 // Function to register a new user
 export async function registerUser(userInfo: RegisterUser) {
@@ -38,7 +48,6 @@ export async function registerUser(userInfo: RegisterUser) {
         facebook: null,
         instagram: null,
         whatsapp: null,
-        online: false,
         lastSeen: null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -51,7 +60,8 @@ export async function registerUser(userInfo: RegisterUser) {
 
 // Update user avatar
 export async function updateUserAvatar(avataUrl: string) {
-    const user = auth.currentUser;
+    
+    const user = await waitForAuth();
     if (!user) {
         throw new Error('No authenticated user found.');
     }
@@ -85,7 +95,7 @@ export async function loginUser(email: string, password: string) {
 
 export async function loadCurrentUser() {
     
-    const currentUser = auth.currentUser;
+    const currentUser = await waitForAuth();
 
     if (!currentUser) {
         return null;
@@ -116,7 +126,6 @@ export async function loadCurrentUser() {
     // Save only user information
     userStore.set({
         ...userInfo,
-        online: true
     } as UserState);
 
     // Save playback speed
@@ -159,7 +168,7 @@ export async function loadCurrentUser() {
     //getting all users from fire base
     export async function loadUsers() {
 
-        const currentUser = auth.currentUser;
+        const currentUser = await waitForAuth();
 
         if (!currentUser) {
             return;
@@ -207,7 +216,7 @@ export async function loadCurrentUser() {
 }
 
 export async function findOrCreateConversation(chatUserUid:string) {
-    const currentUser = auth.currentUser;
+    const currentUser = await waitForAuth();
     if (!currentUser) {
         throw new Error('No authenticated user found.');
     }

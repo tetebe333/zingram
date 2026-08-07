@@ -16,11 +16,11 @@ import { auth } from '$lib/firebase/firebase';
 import { loadChatUser } from '$lib/services/auth';
 import { loadMessages } from '$lib/services/messages';
 import { messagesStore } from '$lib/stores/messages';
-import { userStore } from '$lib/stores/user';
 import { uploadAudio, uploadImage, uploadVideo, uploadDocument} from '$lib/services/cloudinary';
 import { presenceStore } from '$lib/stores/presence';
 import { loadUserPresence, setTyping, setRecording, setOnline } from '$lib/services/presence';
 import { formatLastSeen } from '$lib/utils/lastSeen';
+
 let loadingProfile = $state(false);
 let unsubscribe: (() => void) | undefined
 let unsubscribePresence: (() => void) | undefined
@@ -1092,7 +1092,10 @@ function cancelLongPress() {
     <div class="pt-6 fixed z-40 w-full justify-between border-b border-b-white/5 pb-2 bg-[#010713] flex px-4">
 
         {#if loadingProfile}
-            <p class="text-gray-400 mb-2">Loading profile</p>
+            <div class="flex mb-2  justify-self-start items-center gap-2">
+                <div class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
+                <p class="text-gray-400 text-center">Loading profile...</p>
+            </div>
         {:else}
          <div class="flex gap-4 ">
                 <a class="text-white mt-4" href="/home">
@@ -1134,7 +1137,10 @@ function cancelLongPress() {
     </div>
 
     {#if loadingProfile}
-       <p class="text-gray-400 flex justify-center items-center text-center  pt-60">Loading Measages...</p>
+        <div class="flex pt-60 justify-center items-center gap-2">
+                <div class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
+                <p class="text-gray-400 text-center">Loading Measages...</p>
+        </div>
     {:else}
     {#if $messagesStore.length === 0}
         <div class="flex-col justify-center items-center text-center gap-2 pt-60">

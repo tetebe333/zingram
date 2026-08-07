@@ -17,7 +17,6 @@ export interface UserState {
   instagram: string;
   whatsapp: string;
 
-  online: boolean;
   lastSeen: number;
   updatedAt: string,
   createdAt: string,

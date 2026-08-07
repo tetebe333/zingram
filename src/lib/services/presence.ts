@@ -6,11 +6,20 @@ import {
 } from 'firebase/firestore';
 import { presenceStore } from '$lib/stores/presence';
 import { presenceMapStore } from "$lib/stores/presenceUsers";
+import { onAuthStateChanged, type User } from "firebase/auth";
 
+export function waitForAuth(): Promise<User | null> {
+    return new Promise((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            unsubscribe();
+            resolve(user);
+        });
+    });
+}
 
 
 export async function setOnline() {
-    const currentUser = auth.currentUser;
+    const currentUser = await waitForAuth();
 
     if (!currentUser) return;
 
@@ -24,7 +33,7 @@ export async function setOnline() {
 }
 
 export async function setOffline() {
-    const currentUser = auth.currentUser;
+    const currentUser = await waitForAuth();
 
     if (!currentUser) return;
 
@@ -38,7 +47,7 @@ export async function setOffline() {
 }
 
 export async function setTyping(isTyping: boolean) {
-    const currentUser = auth.currentUser;
+    const currentUser = await waitForAuth();
 
     if (!currentUser) return;
 
@@ -51,7 +60,7 @@ export async function setTyping(isTyping: boolean) {
 }
 
 export async function setRecording(isRecording: boolean) {
-    const currentUser = auth.currentUser;
+    const currentUser =await waitForAuth();
 
     if (!currentUser) return;
 
@@ -64,7 +73,7 @@ export async function setRecording(isRecording: boolean) {
 }
 
 export async function updateLastSeen() {
-    const currentUser = auth.currentUser;
+    const currentUser = await waitForAuth();
 
     if (!currentUser) return;
 

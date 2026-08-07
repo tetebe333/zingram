@@ -4,16 +4,11 @@ import { messagesStore, type MessageState } from "$lib/stores/messages";
 
 import {
     collection,
-    getDocs,
     query,
     where,
     orderBy,
     onSnapshot,
-    doc,
-    updateDoc,
-    serverTimestamp
 } from "firebase/firestore";
-import { auth } from "$lib/firebase/firebase";
 
 export function loadMessages(conversationId: string) {
 
