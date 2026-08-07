@@ -7,12 +7,23 @@ import { onMount } from 'svelte';
 import { auth } from '$lib/firebase/firebase';
 import { goto } from '$app/navigation';
 import { loadCurrentUser } from '$lib/services/auth';
+import { onAuthStateChanged, type User } from "firebase/auth";
+
+export function waitForAuth(): Promise<User | null> {
+    return new Promise((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            unsubscribe();
+            resolve(user);
+        });
+    });
+}
 
 
 //checking if there is current user
 onMount(async () => {
+    let currentUser = await waitForAuth();
     try {
-        if (auth.currentUser) {
+        if (currentUser) {
             await loadCurrentUser();
             goto('/home');
         }
