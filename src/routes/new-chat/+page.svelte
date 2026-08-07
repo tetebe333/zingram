@@ -8,7 +8,6 @@ import { usersStore } from '$lib/stores/users';
 import {goto} from '$app/navigation';
 import { type UserState } from '$lib/stores/user';
 import { findOrCreateConversation } from '$lib/services/auth';
-import { setOnline } from '$lib/services/presence';
 import { loadUsersPresence } from "$lib/services/presence";
 import { presenceMapStore } from '$lib/stores/presenceUsers';
 
@@ -17,7 +16,6 @@ let unsubscribePresenceMap: (() => void) | undefined;
 onMount(async () => {
     await loadUsers();
     await tick();
-    setOnline();
 
     const users = $usersStore.users;
 
@@ -108,18 +106,17 @@ function cancelLongPress() {
             <p class="text-gray-400 mt-50 text-center">loading Users...</p>
         {:else}
             {#each filteredUsers as user}
-                <a
-                    href="/"
-                    onclick={(e)=>{
+                <div
+                    role="button"
+                    tabindex="0"
+                    onclick={() => {
                         if (longPressTriggered) {
-                            e.preventDefault();
                             return;
                         }
 
-                        e.preventDefault();
                         startChat(user.uid);
                     }}
-                    oncontextmenu={(e)=>{
+                    oncontextmenu={(e) => {
                         e.preventDefault();
                         openContextMenu(user);
                     }}
@@ -130,20 +127,32 @@ function cancelLongPress() {
                 >
                     <div class="mt-5 flex justify-between border-b border-b-white/5 pb-2">
                         <div class="flex gap-3 relative">
-                            <img class="w-12 h-12 rounded-full" src={user.profileImage ?? '/male-avatar.PNG'} alt="avata">
+                            <img
+                                class="w-12 h-12 rounded-full"
+                                src={user.profileImage ?? '/male-avatar.PNG'}
+                                alt="avatar"
+                            />
+
                             <div>
-                                <p class="text-sm font-semibold text-gray-400">{user.fullName}</p>
-                                <p class="text-xs font-semibold text-gray-500">{user.username}</p>
+                                <p class="text-sm font-semibold text-gray-400">
+                                    {user.fullName}
+                                </p>
+
+                                <p class="text-xs font-semibold text-gray-500">
+                                    {user.username}
+                                </p>
                             </div>
+
                             {#if $presenceMapStore[user.uid]?.online}
-                            <div class="h-3 w-3 bg-green-500 rounded-full absolute top-8 left-9"></div>
+                                <div class="h-3 w-3 bg-green-500 rounded-full absolute top-8 left-9"></div>
                             {/if}
                         </div>
+
                         <div class="text-blue-500">
-                            <MessageSquare size="18"/>
+                            <MessageSquare size="18" />
                         </div>
                     </div>
-                </a>
+                </div>
             {/each}
 
             {#if showContextMenu && selectedUser}

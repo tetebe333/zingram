@@ -1711,7 +1711,7 @@ function cancelLongPress() {
                 }}
                 rows="1"
                 placeholder="Type a message..."
-                class="w-full bg-transparent text-gray-200 outline-none resize-none px-2 py-1 max-h-40 text-sm overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] scrollbar-none"
+                class="w-full bg-transparent text-gray-200 outline-none resize-none px-2 py-1 max-h-40 text-base overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] scrollbar-none"
                 ></textarea>
                 
                 <!-- Right Action Group: Stays anchored side-by-side at the bottom-right -->
@@ -1781,7 +1781,7 @@ function cancelLongPress() {
                 }}
                 rows="1"
                 placeholder="Type a message..."
-                class="w-full bg-transparent text-gray-200 outline-none resize-none px-2 py-1 max-h-40 text-sm overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] scrollbar-none"
+                class="w-full bg-transparent text-gray-200 outline-none resize-none px-2 py-1 max-h-40 text-base overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] scrollbar-none"
                 ></textarea>
                 
                 <!-- Right Action Group: Stays anchored side-by-side at the bottom-right -->
