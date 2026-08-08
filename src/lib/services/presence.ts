@@ -46,7 +46,10 @@ export async function setOffline() {
     );
 }
 
-export async function setTyping(isTyping: boolean) {
+export async function setTyping(
+    isTyping: boolean,
+    conversationId: string | null
+) {
     const currentUser = await waitForAuth();
 
     if (!currentUser) return;
@@ -54,20 +57,25 @@ export async function setTyping(isTyping: boolean) {
     await updateDoc(
         doc(db, 'userPresence', currentUser.uid),
         {
-            typing: isTyping
+            typing: isTyping,
+            currentConversationId: isTyping ? conversationId : null
         }
     );
 }
 
-export async function setRecording(isRecording: boolean) {
-    const currentUser =await waitForAuth();
+export async function setRecording(
+    isRecording: boolean,
+    conversationId: string | null
+) {
+    const currentUser = await waitForAuth();
 
     if (!currentUser) return;
 
     await updateDoc(
         doc(db, 'userPresence', currentUser.uid),
         {
-            recording: isRecording
+            recording: isRecording,
+            currentConversationId: isRecording ? conversationId : null
         }
     );
 }
@@ -96,6 +104,7 @@ export function loadUserPresence(uid: string) {
         presenceStore.set({
             ...data,
             lastSeen: data.lastSeen?.toDate?.() ?? null
+
         } as any);
     });
 }

@@ -186,7 +186,7 @@ function cancelLongPress() {
                     <button
                         class="w-full px-4 py-3 text-left hover:bg-white/5"
                         onclick={() => {
-                            // We'll build this later
+                            goto(`/user/${selectedUser?.uid}`)
                             showContextMenu = false;
                         }}
                     >

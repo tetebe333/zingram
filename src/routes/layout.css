@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
+@theme {
+  --color-muted: #7D8698;
+ --color-Lmuted: #9CA3AF;
+}
 
 @theme {
   /* 1. Changed "steps" to "ease-in-out" for a smooth transition */

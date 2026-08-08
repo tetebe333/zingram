@@ -13,6 +13,7 @@ export interface UserState {
   title: string;
   language: string;
 
+  website:  string;
   facebook: string;
   instagram: string;
   whatsapp: string;

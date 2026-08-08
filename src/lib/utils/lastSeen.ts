@@ -7,14 +7,14 @@ export function formatLastSeen(date: Date | null): string {
 
     // Less than 1 minute
     if (diff < 60) {
-        return 'Last seen just now';
+        return 'just now';
     }
 
     // Minutes
     if (diff < 3600) {
         const minutes = Math.floor(diff / 60);
 
-        return `Last seen ${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+        return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
     }
 
     // Hours (same day)
@@ -22,7 +22,7 @@ export function formatLastSeen(date: Date | null): string {
         now.toDateString() === date.toDateString();
 
     if (isToday) {
-        return `Last seen today at ${date.toLocaleTimeString([], {
+        return `today at ${date.toLocaleTimeString([], {
             hour: 'numeric',
             minute: '2-digit'
         })}`;
@@ -33,14 +33,14 @@ export function formatLastSeen(date: Date | null): string {
     yesterday.setDate(now.getDate() - 1);
 
     if (yesterday.toDateString() === date.toDateString()) {
-        return `Last seen yesterday at ${date.toLocaleTimeString([], {
+        return `yesterday at ${date.toLocaleTimeString([], {
             hour: 'numeric',
             minute: '2-digit'
         })}`;
     }
 
     // Older
-    return `Last seen ${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
+    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
         hour: 'numeric',
         minute: '2-digit'
     })}`;

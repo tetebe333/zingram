@@ -42,9 +42,10 @@ export async function registerUser(userInfo: RegisterUser) {
         gender: userInfo.gender,
         bio: null,
         title: null,
-        language: null,
+        language: "English",
         playbackSpeed: 1, 
 
+        website:  null,
         facebook: null,
         instagram: null,
         whatsapp: null,

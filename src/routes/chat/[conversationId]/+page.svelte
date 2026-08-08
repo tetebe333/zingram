@@ -2,12 +2,7 @@
 //svelte-ignore non_reactive_update
 let messageContainer: HTMLDivElement;
 import { 
-ArrowLeft ,
-MessageCircleMore, ChevronDown, Plus, Ban, SquarePen, Camera, Mic , Image , Video, FileText, Send, X, Trash2,Square , Play,
-
-ToyBrick
-
-} from 'lucide-svelte';
+ArrowLeft, MessageCircleMore, ChevronDown, Plus, Ban, SquarePen, Camera, Mic , Image , Video, FileText, Send, X, Trash2,Square , Play,} from 'lucide-svelte';
 import { page }  from '$app/state' 
 import {onMount, onDestroy, tick}  from 'svelte'
 import { loadConversation, sendMessage, deleteMessage, editMessage} from '$lib/services/chat'
@@ -20,6 +15,7 @@ import { uploadAudio, uploadImage, uploadVideo, uploadDocument} from '$lib/servi
 import { presenceStore } from '$lib/stores/presence';
 import { loadUserPresence, setTyping, setRecording, setOnline } from '$lib/services/presence';
 import { formatLastSeen } from '$lib/utils/lastSeen';
+import { goto } from '$app/navigation';
 
 let loadingProfile = $state(false);
 let unsubscribe: (() => void) | undefined
@@ -96,6 +92,8 @@ onMount(async ()=> {
 })
 
 onDestroy(() => {
+    setTyping(false, conversationId);
+    setRecording(false, conversationId);
     // Stop Firestore listener
     unsubscribe?.();
     //stop presence listener
@@ -419,7 +417,7 @@ let discardEdit = $state(false);
         });
 
         // ✅ User granted permission
-        await setRecording(true);
+        await setRecording(true, conversationId);
 
         audioChunks = [];
 
@@ -442,7 +440,7 @@ let discardEdit = $state(false);
             stream.getTracks().forEach(track => track.stop());
 
             // User is no longer recording
-            await setRecording(false);
+            await setRecording(false, conversationId);
 
             audioBlob = new Blob(audioChunks, {
                 type: mediaRecorder.mimeType
@@ -467,12 +465,12 @@ let discardEdit = $state(false);
         )
 
         // Just to be safe
-        await setRecording(false);
+        await setRecording(false, conversationId);
     }
 }
 
 async function stopRecording() {
-    await setRecording(false);
+    await setRecording(false, conversationId);
     mediaRecorder?.stop();
 
     if (recordingTimer) {
@@ -484,7 +482,7 @@ async function stopRecording() {
 }
 
 async function deletRecording() {
-    await setRecording(false);
+    await setRecording(false, conversationId);
     // Stop timer
     if (recordingTimer) {
         clearInterval(recordingTimer);
@@ -527,7 +525,7 @@ async function deletRecording() {
 
 async function sendRecording() {
     scrollToBottom();
-    await setRecording(false);
+    await setRecording(false, conversationId);
 
     if(!audioBlob) return;
     if (recordedDuration === null) return
@@ -900,21 +898,20 @@ function handleCameraCapture(event: Event) {
 
 async function handleTyping() {
 
-    // tell firebase we are typing
-    await setTyping(true);
+    // Tell Firebase which conversation we are typing in
+    await setTyping(true, conversationId);
 
-    // reset the timer every key press
+    // Reset the timer every key press
     if (typingTimeout) {
         clearTimeout(typingTimeout);
     }
 
-    // after 2 seconds of no typing
+    // After 2 seconds of no typing
     typingTimeout = setTimeout(async () => {
 
-        await setTyping(false);
+        await setTyping(false, conversationId);
 
     }, 2000);
-
 }
 
 function openMessageMenu(event: MouseEvent, message: any) {
@@ -1089,7 +1086,7 @@ function cancelLongPress() {
     showAttachmentMenu = false;
     closeMessageMenu();
 }}>
-    <div class="pt-6 fixed z-40 w-full justify-between border-b border-b-white/5 pb-2 bg-[#010713] flex px-4">
+    <div class="py-3  fixed z-40 w-full justify-between border-b border-b-white/5  bg-[#010713] flex px-4">
 
         {#if loadingProfile}
             <div class="flex mb-2  justify-self-start items-center gap-2">
@@ -1097,40 +1094,50 @@ function cancelLongPress() {
                 <p class="text-gray-400 text-center">Loading profile...</p>
             </div>
         {:else}
-         <div class="flex gap-4 ">
-                <a class="text-white mt-4" href="/home">
-                    <ArrowLeft   size="22"/>
-                </a>
-            <img class="w-12 h-12 rounded-full" src={$chatUserStore?.profileImage ?? '/male-avatar.PNG'} alt="avata">
-            <div>
-                <p class="text-sm font-semibold text-gray-300">{$chatUserStore?.fullName}</p>
-                <p class="text-xs font-semibold text-gray-500">{$chatUserStore?.username}</p>
-                {#if $presenceStore.typing}
-                    <p class="text-xs font-semibold text-blue-500">
-                        Typing...
-                    </p>
+         <div class="flex justify-between">
+                <div class="flex gap-4">
+                    <a class="text-white mt-4" href="/home">
+                        <ArrowLeft   size="22"/>
+                    </a>
+                
+                    <div onclick={() => goto(`/user/${$chatUserStore?.uid}`)}
+                    class="flex gap-4">
+                        <img class="w-12 h-12 rounded-full" src={$chatUserStore?.profileImage ?? '/male-avatar.PNG'} alt="avata">
+                        <div>
+                            <p class="text-sm font-semibold text-gray-300">{$chatUserStore?.fullName}</p>
+                            <p class="text-xs font-semibold text-gray-500">{$chatUserStore?.username}</p>
+                            {#if $presenceStore.typing && $presenceStore.currentConversationId === page.params.conversationId}
+                            <p class="text-xs font-semibold text-blue-500">
+                                Typing...
+                            </p>
 
-                {:else if $presenceStore.recording}
-                    <p class="text-xs font-semibold text-red-500">
-                        Recording...
-                    </p>
+                            {:else if $presenceStore.recording && $presenceStore.currentConversationId === page.params.conversationId}
+                                <p class="text-xs font-semibold text-red-500">
+                                    Recording...
+                                </p>
 
-                {:else if $presenceStore.online}
-                    <p class="text-xs font-semibold text-green-500">
-                        Online
-                    </p>
+                            {:else if $presenceStore.online}
+                                <p class="text-xs font-semibold text-green-500">
+                                    Online
+                                </p>
 
-                {:else}
-                    <p class="text-xs font-semibold text-gray-500">
-                        {formatLastSeen($presenceStore.lastSeen)}
-                    </p>
-                {/if}
+                            {:else}
+                                <p class="text-xs font-semibold text-gray-500">
+                                    Last seen {formatLastSeen($presenceStore.lastSeen)}
+                                </p>
+                            {/if}
 
+                        </div>
+                    </div>
+                    {#if $presenceStore?.online}
+                    <div class="h-3 w-3 bg-green-500 rounded-full absolute top-15 left-22"></div>
+                    {/if}
+                </div>
             </div>
-            {#if $presenceStore?.online}
-             <div class="h-3 w-3 bg-green-500 rounded-full absolute top-15 left-22"></div>
-            {/if}
-        </div>
+            <div onclick={() => goto(`/user/${$chatUserStore?.uid}`)}
+            class="mt-3 h-8 w-8 rounded-full bg-blue-600 flex justify-center items-center text-2xl font-semibold text-gray-300">
+                <i><p>i</p></i>
+            </div>
         {/if}
         
         
