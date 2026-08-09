@@ -1,16 +1,28 @@
 import { writable } from 'svelte/store';
 
-export { writable } from 'svelte/store'
+export interface ConversationState {
+    id: string;
+    participants: string[];
+    lastMessage: string | null;
+    lastMessageType:
+        | 'text'
+        | 'image'
+        | 'video'
+        | 'audio'
+        | 'document'
+        | 'deleted'
+        | null;
+    lastMessageSender: string | null;
+    lastMessageTime: any;
 
-export interface ConversationState{
-    id: string,
-    participants: string[],
-    lastMessage: string | null,
-    lastMessageType: 'text' | 'imgae' | 'video' | 'voice' | 'document' | null;
-    lastMessageSender: string | null,
-    lastMessageTime: any,
-    createdAt: Date,
-    updatedAt: Date
+    createdAt: Date | null;
+    updatedAt: Date | null;
+
+    unread: Record<string, number>;
 }
 
-export const ConversationStore = writable<ConversationState | null>(null);
+export const ConversationStore =
+    writable<ConversationState | null>(null);
+
+export const ConversationsStore =
+    writable<ConversationState[]>([]);

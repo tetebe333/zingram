@@ -71,7 +71,7 @@ async function openChat(uid:string) {
         <a href="/home"
         class="flex gap-1 text-white">
             <ArrowLeft size="18"/>
-            <p class="text-xs font-semibold">Back</p>
+            <p class="text-xs font-semibold">Home</p>
         </a>
         <button onclick={() => { if (user?.uid) openChat(user.uid); }}
         class="flex gap-1 text-blue-600 items-center">
@@ -291,7 +291,7 @@ async function openChat(uid:string) {
                      <p >Sent a message</p>
                     {:else}
                      <p>Haven't send a message</p>
-                    {/if}uo
+                    {/if}
                 </div>
             </div>
            {#if lastMessage}

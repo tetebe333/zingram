@@ -1,3 +1,5 @@
+import { Timestamp } from "firebase/firestore";
+
 export function formatLastSeen(date: Date | null): string {
     if (!date) return 'Offline';
 
@@ -44,4 +46,54 @@ export function formatLastSeen(date: Date | null): string {
         hour: 'numeric',
         minute: '2-digit'
     })}`;
+}
+
+export function formatLastTime(
+    lastMessageTime: Timestamp | Date | null | undefined
+): string {
+    if (!lastMessageTime) {
+        return '';
+    }
+
+    const date =
+        lastMessageTime instanceof Timestamp
+            ? lastMessageTime.toDate()
+            : lastMessageTime;
+
+    const now = new Date();
+
+    const isToday =
+        date.getDate() === now.getDate() &&
+        date.getMonth() === now.getMonth() &&
+        date.getFullYear() === now.getFullYear();
+
+    if (isToday) {
+        return date.toLocaleTimeString('en-NG', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+    }
+
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+
+    const isYesterday =
+        date.getDate() === yesterday.getDate() &&
+        date.getMonth() === yesterday.getMonth() &&
+        date.getFullYear() === yesterday.getFullYear();
+
+    if (isYesterday) {
+        return `Yesterday, ${date.toLocaleTimeString('en-NG', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        })}`;
+    }
+
+    return date.toLocaleDateString('en-NG', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
 }

@@ -5,7 +5,7 @@ import {
 ArrowLeft, MessageCircleMore, ChevronDown, Plus, Ban, SquarePen, Camera, Mic , Image , Video, FileText, Send, X, Trash2,Square , Play,} from 'lucide-svelte';
 import { page }  from '$app/state' 
 import {onMount, onDestroy, tick}  from 'svelte'
-import { loadConversation, sendMessage, deleteMessage, editMessage} from '$lib/services/chat'
+import { loadConversation, sendMessage, deleteMessage, editMessage, listenAndClearUnread} from '$lib/services/chat'
 import {chatUserStore} from '$lib/stores/chatUser'
 import { auth } from '$lib/firebase/firebase';
 import { loadChatUser } from '$lib/services/auth';
@@ -19,6 +19,7 @@ import { goto } from '$app/navigation';
 
 let loadingProfile = $state(false);
 let unsubscribe: (() => void) | undefined
+let unsubscribeUnread: (() => void) | undefined
 let unsubscribePresence: (() => void) | undefined
 
 const conversationId = $derived(page.params.conversationId as string);
@@ -63,39 +64,51 @@ $effect(() => {
     });
 });
 
-onMount(async ()=> {                
-  loadingProfile = true;
-  setOnline()
-   const conversation = await loadConversation(conversationId);
+onMount(async () => {
+    loadingProfile = true;
 
-   //load all message
+    const conversation = await loadConversation(conversationId);
+
+    // Load all messages
     unsubscribe = loadMessages(conversationId);
-    const currentUid = auth.currentUser?.uid;
- 
 
-    //getting chat user info
+    const currentUid = auth.currentUser?.uid;
+
+    if (!currentUid) {
+        loadingProfile = false;
+        return;
+    }
+
+    unsubscribeUnread = listenAndClearUnread(
+        conversationId,
+        currentUid
+    );
+
+    // Getting chat user info
     const otherUserUid = conversation.participants.find(
         uid => uid !== currentUid
     );
 
     if (otherUserUid) {
-        //load other ser profile
+        // Load other user's profile
         await loadChatUser(otherUserUid);
 
-        //Start listening to their presence
+        // Start listening to their presence
         unsubscribePresence = loadUserPresence(otherUserUid);
     }
+
     loadingProfile = false;
 
     await tick();
     scrollToBottom();
-})
+});
 
 onDestroy(() => {
     setTyping(false, conversationId);
     setRecording(false, conversationId);
     // Stop Firestore listener
     unsubscribe?.();
+    unsubscribeUnread?.();
     //stop presence listener
     unsubscribePresence?.();
 

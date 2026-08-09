@@ -271,6 +271,11 @@ export async function findOrCreateConversation(chatUserUid:string) {
 
             lastMessageTime: null,
 
+            unread: {
+                [currentUser.uid]: 0,
+                [chatUserUid]: 0
+            },
+
             createdAt: serverTimestamp(),
 
             updatedAt: serverTimestamp()
@@ -292,6 +297,11 @@ export async function findOrCreateConversation(chatUserUid:string) {
             lastMessageSender: null,
 
             lastMessageTime: null,
+
+            unread: {
+                [currentUser.uid]: 0,
+                [chatUserUid]: 0
+            },
 
             createdAt: new Date(),
 

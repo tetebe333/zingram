@@ -1,7 +1,11 @@
-import { db, auth } from '$lib/firebase/firebase';
-import { doc, getDoc, collection, addDoc, updateDoc, serverTimestamp, deleteField, where, query, getDocs } from 'firebase/firestore';
-import { ConversationStore, type ConversationState } from '$lib/stores/conversation';
+import { db,  auth } from '$lib/firebase/firebase';
+import { doc,  orderBy, getDoc, onSnapshot, collection, addDoc, updateDoc, serverTimestamp, deleteField, where, query, getDocs } from 'firebase/firestore';
+import { ConversationStore, ConversationsStore, type ConversationState } from '$lib/stores/conversation';
 import { onAuthStateChanged, type User } from "firebase/auth";
+import { loadUsers } from './auth';
+import { type UserState } from '$lib/stores/user'; 
+import { usersStore } from '$lib/stores/users';
+import { get } from 'svelte/store';
 
 export function waitForAuth(): Promise<User | null> {
     return new Promise((resolve) => {
@@ -36,6 +40,46 @@ export async function loadConversation(id:string){
     return conversation;
 }
 
+export async function loadConversations() {
+    const currentUser = await waitForAuth();
+
+    if (!currentUser) {
+        throw new Error("No authenticated user");
+    }
+
+    const conversationsRef = collection(db, "conversations");
+
+    const conversationsQuery = query(
+        conversationsRef,
+        where("participants", "array-contains", currentUser.uid),
+        orderBy("lastMessageTime", "desc")
+    );
+
+    return new Promise<() => void>((resolve) => {
+        let firstSnapshot = true;
+
+        const unsubscribe = onSnapshot(
+            conversationsQuery,
+            (snapshot) => {
+                const conversations: ConversationState[] =
+                    snapshot.docs.map((doc) => ({
+                        id: doc.id,
+                        ...doc.data()
+                    } as ConversationState));
+
+                ConversationsStore.set(conversations);
+
+                if (firstSnapshot) {
+                    firstSnapshot = false;
+                    resolve(unsubscribe);
+                }
+            },
+            (error) => {
+                console.error("Error listening to conversations:", error);
+            }
+        );
+    });
+}
 
 export async function sendMessage(
     conversationId: string,
@@ -44,13 +88,38 @@ export async function sendMessage(
     fileUrl: string | null = null,
     duration: number | null = null
 ) {
-
     const currentUser = await waitForAuth();
 
     if (!currentUser) {
         throw new Error("No authenticated user");
     }
 
+    const conversationRef = doc(
+        db,
+        "conversations",
+        conversationId
+    );
+
+    // Get the conversation
+    const conversationSnap = await getDoc(conversationRef);
+
+    if (!conversationSnap.exists()) {
+        throw new Error("Conversation not found");
+    }
+
+    const conversation =
+        conversationSnap.data() as ConversationState;
+
+    // Find the other user
+    const recipientId = conversation.participants.find(
+        (uid) => uid !== currentUser.uid
+    );
+
+    if (!recipientId) {
+        throw new Error("Recipient not found");
+    }
+
+    // Save the message
     await addDoc(
         collection(db, "messages"),
         {
@@ -60,14 +129,21 @@ export async function sendMessage(
             text,
             fileUrl,
             duration,
+
             createdAt: serverTimestamp(),
+
             editedAt: null,
             deletedAt: null,
         }
     );
 
+    // Current unread count of recipient
+    const currentRecipientUnread =
+        conversation.unread?.[recipientId] ?? 0;
+
+    // Update conversation
     await updateDoc(
-        doc(db, "conversations", conversationId),
+        conversationRef,
         {
             lastMessage:
                 type === "text"
@@ -80,7 +156,10 @@ export async function sendMessage(
 
             lastMessageTime: serverTimestamp(),
 
-            updatedAt: serverTimestamp()
+            updatedAt: serverTimestamp(),
+
+            [`unread.${recipientId}`]:
+                currentRecipientUnread + 1
         }
     );
 }
@@ -128,4 +207,58 @@ export async function deleteMessage(messageId: string) {
 
     });
 
+}
+
+
+export async function loadConversationUser(
+    participants: string[],
+    currentUser: UserState
+) {
+    if (!currentUser) {
+        return null;
+    }
+
+    // Find the other person in this conversation
+    const conversationUserId = participants.find(
+        (uid) => uid !== currentUser.uid
+    );
+
+    if (!conversationUserId) {
+        return null;
+    }
+
+    // Make sure users have been loaded
+    await loadUsers();
+
+    // Get the users currently stored in usersStore
+    const users = get(usersStore).users;
+
+    // Find the exact user belonging to this conversation
+    const conversationUser = users.find(
+        (user: UserState) => user.uid === conversationUserId
+    );
+
+    return conversationUser ?? null;
+}
+
+
+export function listenAndClearUnread(conversationId: string, currentUid: string) {
+    const conversationRef = doc(db, "conversations", conversationId);
+
+    const unsubscribe = onSnapshot(conversationRef, async (snapshot) => {
+        if (!snapshot.exists()) return;
+
+        const conversation = snapshot.data();
+
+        const unread = conversation.unread ?? {};
+        const currentUnread = unread[currentUid] ?? 0;
+
+        if (currentUnread > 0) {
+            await updateDoc(conversationRef, {
+                [`unread.${currentUid}`]: 0
+            });
+        }
+    });
+
+    return unsubscribe;
 }
