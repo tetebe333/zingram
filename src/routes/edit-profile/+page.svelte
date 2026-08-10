@@ -9,9 +9,7 @@
         VenusAndMars,
         Globe,
         Briefcase,
-        Link,
-       
-        MessageCircle
+        Link
     } from 'lucide-svelte';
 
     import { userStore } from '$lib/stores/user';
@@ -21,6 +19,7 @@
     import { db } from '$lib/firebase/firebase';
 
     let isLoading = $state(true);
+    let isSaving = $state(false);
 
     let fullName = $state('');
     let username = $state('');
@@ -69,21 +68,20 @@
 
     function handleImageChange(event: Event) {
         const input = event.currentTarget as HTMLInputElement;
-
         const file = input.files?.[0];
 
         if (!file) return;
 
         selectedImage = file;
 
-        // Remove previous preview URL
         if (previewImage) {
             URL.revokeObjectURL(previewImage);
         }
 
-        // Only preview locally.
-        // Nothing is uploaded yet.
         previewImage = URL.createObjectURL(file);
+
+        // Allow selecting the same image again later.
+        input.value = '';
     }
 
     function cancelSelectedImage() {
@@ -101,71 +99,72 @@
         goto(`/myProfile/${$userStore.uid}`);
     }
 
-   async function saveProfile() {
-    if (!$userStore?.uid) return;
+    async function saveProfile() {
+        if (!$userStore?.uid || isSaving) return;
 
-    try {
-        isLoading = true;
+        try {
+            isSaving = true;
 
-        let updatedProfileImage = profileImage;
+            let updatedProfileImage = profileImage;
 
-        // Upload new profile picture only when Save is clicked
-        if (selectedImage) {
-            updatedProfileImage = await uploadImage(selectedImage);
+            // Upload the image only when Save is clicked.
+            if (selectedImage) {
+                updatedProfileImage = await uploadImage(selectedImage);
+            }
+
+            await updateDoc(
+                doc(db, 'users', $userStore.uid),
+                {
+                    fullName,
+                    username,
+                    bio,
+                    dateOfBirth,
+                    gender,
+                    language,
+                    title,
+                    website,
+                    facebook,
+                    instagram,
+                    whatsapp,
+                    profileImage: updatedProfileImage
+                }
+            );
+
+            // Update the local user store immediately.
+            userStore.set({
+                ...$userStore,
+                fullName,
+                username,
+                bio,
+                dateOfBirth,
+                gender,
+                language,
+                title,
+                website,
+                facebook,
+                instagram,
+                whatsapp,
+                profileImage: updatedProfileImage
+            });
+
+            // Clean up preview URL.
+            if (previewImage) {
+                URL.revokeObjectURL(previewImage);
+            }
+
+            previewImage = null;
+            selectedImage = null;
+            profileImage = updatedProfileImage;
+
+            goto(`/myProfile/${$userStore.uid}`);
+
+        } catch (error) {
+            console.error('Failed to update profile:', error);
+            alert('Failed to update profile. Please try again.');
+        } finally {
+            isSaving = false;
         }
-
-        await updateDoc(doc(db, 'users', $userStore.uid), {
-            fullName,
-            username,
-            bio,
-            dateOfBirth,
-            gender,
-            language,
-            title,
-            website,
-            facebook,
-            instagram,
-            whatsapp,
-            profileImage: updatedProfileImage
-        });
-
-        // Update local store so the new information is immediately available
-        userStore.set({
-            ...$userStore,
-            fullName,
-            username,
-            bio,
-            dateOfBirth,
-            gender,
-            language,
-            title,
-            website,
-            facebook,
-            instagram,
-            whatsapp,
-            profileImage: updatedProfileImage
-        });
-
-        // Clean up local preview
-        if (previewImage) {
-            URL.revokeObjectURL(previewImage);
-        }
-
-        previewImage = null;
-        selectedImage = null;
-        profileImage = updatedProfileImage;
-
-        goto(`/myProfile/${$userStore.uid}`);
-
-    } catch (error) {
-        console.error('Failed to update profile:', error);
-        alert('Failed to update profile: try again')
-    } finally {
-        isLoading = false;
     }
-}
-
-    
 </script>
 
 
@@ -203,13 +202,19 @@
             <button
                 type="button"
                 onclick={saveProfile}
-                class="flex items-center gap-1 text-blue-500"
+                disabled={isSaving}
+                class="flex min-h-10 items-center gap-1 px-2 text-base font-semibold text-blue-500 disabled:opacity-50"
             >
-                <Save size="18" />
+                {#if isSaving}
+                    <div
+                        class="h-4 w-4 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-500"
+                    ></div>
 
-                <span class="text-sm font-semibold">
-                    Save
-                </span>
+                    <span>Saving...</span>
+                {:else}
+                    <Save size="18" />
+                    <span>Save</span>
+                {/if}
             </button>
 
         </div>
@@ -229,7 +234,7 @@
                 <!-- Camera -->
                 <label
                     for="profile-image"
-                    class="absolute bottom-0 right-2.5 flex h-7.5 w-7.5 cursor-pointer items-center justify-center rounded-full bg-blue-500 text-white shadow-lg"
+                    class="absolute bottom-0 right-2.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-blue-500 text-white shadow-lg"
                 >
                     <Camera size="19" />
 
@@ -249,7 +254,7 @@
                     <button
                         type="button"
                         onclick={cancelSelectedImage}
-                        class="absolute left-2.5 top-0 flex h-7.5 w-7.5 items-center justify-center rounded-full bg-red-500 text-white shadow-lg"
+                        class="absolute left-2.5 top-0 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white shadow-lg"
                     >
                         <X size="16" />
                     </button>
@@ -264,15 +269,20 @@
         <!-- Basic information -->
         <div class="mt-8 space-y-5">
 
-            <!-- Full name -->
+            <!-- Full Name -->
             <div>
-                <label for="full-name" class="mb-2 block text-xs font-semibold text-gray-400">
+                <label
+                    for="full-name"
+                    class="mb-2 block text-xs font-semibold text-gray-400"
+                >
                     Full Name
                 </label>
 
                 <input
+                    id="full-name"
                     bind:value={fullName}
                     type="text"
+                    autocomplete="name"
                     class="w-full rounded-xl border border-[#202D46] bg-[#0B1220] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
             </div>
@@ -281,19 +291,26 @@
             <!-- Bio -->
             <div>
                 <div class="mb-2 flex justify-between">
-                    <label for="bio" class="text-xs font-semibold text-gray-400">
+
+                    <label
+                        for="bio"
+                        class="text-xs font-semibold text-gray-400"
+                    >
                         Bio
                     </label>
 
                     <span class="text-[10px] text-gray-500">
                         {bio.length}/120
                     </span>
+
                 </div>
 
                 <textarea
+                    id="bio"
                     bind:value={bio}
                     maxlength="120"
                     rows="4"
+                    placeholder="Add bio"
                     class="w-full resize-none rounded-xl border border-[#202D46] bg-[#0B1220] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 ></textarea>
             </div>
@@ -301,11 +318,15 @@
 
             <!-- Email -->
             <div>
-                <label for="email" class="mb-2 block text-xs font-semibold text-gray-400">
+                <label
+                    for="email"
+                    class="mb-2 block text-xs font-semibold text-gray-400"
+                >
                     Email Address
                 </label>
 
                 <input
+                    id="email"
                     value={email}
                     type="email"
                     disabled
@@ -320,43 +341,58 @@
         </div>
 
 
-        <!-- Account / personal details -->
+        <!-- Personal Details -->
         <div class="mt-8 rounded-2xl border border-[#202D46] bg-[#0B1220] px-4 pt-5">
 
             <div class="mb-5 flex items-center gap-3">
-                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/15">
+
+                <div
+                    class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/15"
+                >
                     <Globe size="17" class="text-blue-500" />
                 </div>
 
                 <p class="text-sm font-semibold">
                     Personal Details
                 </p>
+
             </div>
 
 
             <!-- Username -->
             <div class="border-b border-[#202D46] pb-4">
-                <labe for="user-name" class="mb-2 block text-xs text-gray-500">
+
+                <label
+                    for="user-name"
+                    class="mb-2 block text-xs text-gray-500"
+                >
                     Username
-                </labe>
+                </label>
 
                 <input
+                    id="user-name"
                     bind:value={username}
                     type="text"
-                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base outline-none focus:border-blue-500"
+                    autocomplete="username"
+                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
+
             </div>
 
 
             <!-- Date of birth -->
             <div class="border-b border-[#202D46] py-4">
 
-                <label for="date-of -birth" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                <label
+                    for="date-of-birth"
+                    class="mb-2 flex items-center gap-2 text-xs text-gray-500"
+                >
                     <Calendar size="15" />
                     Date Of Birth
                 </label>
 
                 <input
+                    id="date-of-birth"
                     bind:value={dateOfBirth}
                     type="date"
                     class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
@@ -368,14 +404,18 @@
             <!-- Gender -->
             <div class="border-b border-[#202D46] py-4">
 
-                <label for="gender" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                <label
+                    for="gender"
+                    class="mb-2 flex items-center gap-2 text-xs text-gray-500"
+                >
                     <VenusAndMars size="15" />
                     Gender
                 </label>
 
                 <select
+                    id="gender"
                     bind:value={gender}
-                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-sm text-white outline-none"
+                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 >
                     <option value="">Select gender</option>
                     <option value="male">Male</option>
@@ -388,12 +428,16 @@
             <!-- Language -->
             <div class="border-b border-[#202D46] py-4">
 
-                <labe for="language" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                <label
+                    for="language"
+                    class="mb-2 flex items-center gap-2 text-xs text-gray-500"
+                >
                     <Globe size="15" />
                     Language
-                </labe>
+                </label>
 
                 <input
+                    id="language"
                     bind:value={language}
                     type="text"
                     class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
@@ -405,12 +449,16 @@
             <!-- Title -->
             <div class="border-b border-[#202D46] py-4">
 
-                <label for="title" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                <label
+                    for="title"
+                    class="mb-2 flex items-center gap-2 text-xs text-gray-500"
+                >
                     <Briefcase size="15" />
                     Title
                 </label>
 
                 <input
+                    id="title"
                     bind:value={title}
                     placeholder="MR / MRS"
                     type="text"
@@ -423,14 +471,19 @@
             <!-- Website -->
             <div class="border-b border-[#202D46] py-4">
 
-                <label for="website" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                <label
+                    for="website"
+                    class="mb-2 flex items-center gap-2 text-xs text-gray-500"
+                >
                     <Link size="15" />
                     Website
                 </label>
 
                 <input
+                    id="website"
                     bind:value={website}
                     type="url"
+                    inputmode="url"
                     placeholder="https://..."
                     class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
@@ -441,15 +494,22 @@
             <!-- Facebook -->
             <div class="border-b border-[#202D46] py-4">
 
-                <label for="facebook" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
-                    <!-- <Facebook size="15" /> -->
-                     <p class="font-bold text-xl text-blue-600"><i>F</i></p>
+                <label
+                    for="facebook"
+                    class="mb-2 flex items-center gap-2 text-xs text-gray-500"
+                >
+                    <p class="text-xl font-bold text-blue-600">
+                        <i>F</i>
+                    </p>
+
                     Facebook
                 </label>
 
                 <input
+                    id="facebook"
                     bind:value={facebook}
                     type="url"
+                    inputmode="url"
                     placeholder="Add Facebook profile URL"
                     class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
@@ -460,19 +520,24 @@
             <!-- Instagram -->
             <div class="border-b border-[#202D46] py-4">
 
-                <label for="instagram" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
-                    <!-- <Instagram size="15" /> -->
+                <label
+                    for="instagram"
+                    class="mb-2 flex items-center gap-2 text-xs text-gray-500"
+                >
                     <img
                         src="/icons8-instagram-logo-94.png"
                         alt="Instagram"
                         class="h-5 w-5"
                     />
+
                     Instagram
                 </label>
 
                 <input
+                    id="instagram"
                     bind:value={instagram}
                     type="url"
+                    inputmode="url"
                     placeholder="Add Instagram profile URL"
                     class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
@@ -483,18 +548,24 @@
             <!-- WhatsApp -->
             <div class="py-4">
 
-                <label for="whatsapp" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                <label
+                    for="whatsapp"
+                    class="mb-2 flex items-center gap-2 text-xs text-gray-500"
+                >
                     <img
                         src="/icons8-whatsapp-logo-94.png"
                         alt="WhatsApp"
                         class="h-5 w-5"
                     />
+
                     WhatsApp
                 </label>
 
                 <input
+                    id="whatsapp"
                     bind:value={whatsapp}
-                    type="text"
+                    type="tel"
+                    inputmode="tel"
                     placeholder="+234..."
                     class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
@@ -504,14 +575,27 @@
         </div>
 
 
-        <!-- Bottom save -->
+        <!-- Bottom Save -->
         <button
             type="button"
             onclick={saveProfile}
-            class="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-500 py-4 text-sm font-bold text-white shadow-[0_0_30px_rgba(37,99,235,.25)]"
+            disabled={isSaving}
+            class="mt-7 flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-4 text-base font-bold text-white shadow-[0_0_30px_rgba(37,99,235,.25)] disabled:cursor-not-allowed disabled:opacity-50"
         >
-            <Save size="18" />
-            Save Changes
+            {#if isSaving}
+
+                <div
+                    class="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                ></div>
+
+                <span>Saving...</span>
+
+            {:else}
+
+                <Save size="18" />
+                <span>Save Changes</span>
+
+            {/if}
         </button>
 
     {/if}
