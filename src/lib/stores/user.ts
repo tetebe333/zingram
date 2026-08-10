@@ -1,3 +1,4 @@
+import type { Timestamp } from "firebase/firestore";
 import { writable } from "svelte/store";
 
 export interface UserState {
@@ -20,7 +21,7 @@ export interface UserState {
 
   lastSeen: number;
   updatedAt: string,
-  createdAt: string,
+  createdAt: Timestamp,
 }
 
 export const userStore  = writable<UserState | null> (null);

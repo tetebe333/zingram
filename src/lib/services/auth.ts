@@ -119,8 +119,6 @@ export async function loadCurrentUser() {
     // Remove fields that don't belong in userStore
     const {
         playbackSpeed,
-        createdAt,
-        updatedAt,
         ...userInfo
     } = userData;
 

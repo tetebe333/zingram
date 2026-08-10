@@ -16,6 +16,9 @@
 
     import { userStore } from '$lib/stores/user';
     import { loadCurrentUser } from '$lib/services/auth';
+    import { uploadImage } from '$lib/services/cloudinary';
+    import { doc, updateDoc } from 'firebase/firestore';
+    import { db } from '$lib/firebase/firebase';
 
     let isLoading = $state(true);
 
@@ -55,7 +58,7 @@
                 whatsapp = $userStore.whatsapp ?? '';
 
                 profileImage =
-                    $userStore.profileImage ?? '/male-avatar.PNG';
+                    $userStore.profileImage ?? '/icons8-user-64.png';
             }
         } catch (error) {
             console.error('Failed to load current user:', error);
@@ -98,23 +101,23 @@
         goto(`/myProfile/${$userStore.uid}`);
     }
 
-    async function saveProfile() {
-        /*
-         * We will put the Firebase update logic here next.
-         *
-         * The important thing is:
-         *
-         * - selectedImage is uploaded only when Save is clicked
-         * - profileImage remains unchanged if the user cancels
-         * - all the text fields are saved together
-         * - username availability checking will go here
-         */
+   async function saveProfile() {
+    if (!$userStore?.uid) return;
 
-        console.log({
+    try {
+        isLoading = true;
+
+        let updatedProfileImage = profileImage;
+
+        // Upload new profile picture only when Save is clicked
+        if (selectedImage) {
+            updatedProfileImage = await uploadImage(selectedImage);
+        }
+
+        await updateDoc(doc(db, 'users', $userStore.uid), {
             fullName,
             username,
             bio,
-            email,
             dateOfBirth,
             gender,
             language,
@@ -123,9 +126,46 @@
             facebook,
             instagram,
             whatsapp,
-            selectedImage
+            profileImage: updatedProfileImage
         });
+
+        // Update local store so the new information is immediately available
+        userStore.set({
+            ...$userStore,
+            fullName,
+            username,
+            bio,
+            dateOfBirth,
+            gender,
+            language,
+            title,
+            website,
+            facebook,
+            instagram,
+            whatsapp,
+            profileImage: updatedProfileImage
+        });
+
+        // Clean up local preview
+        if (previewImage) {
+            URL.revokeObjectURL(previewImage);
+        }
+
+        previewImage = null;
+        selectedImage = null;
+        profileImage = updatedProfileImage;
+
+        goto(`/myProfile/${$userStore.uid}`);
+
+    } catch (error) {
+        console.error('Failed to update profile:', error);
+        alert('Failed to update profile: try again')
+    } finally {
+        isLoading = false;
     }
+}
+
+    
 </script>
 
 
@@ -139,7 +179,7 @@
             ></div>
 
             <p class="text-sm text-gray-400">
-                Loading profile...
+                Loading Edit...
             </p>
         </div>
 
@@ -189,7 +229,7 @@
                 <!-- Camera -->
                 <label
                     for="profile-image"
-                    class="absolute bottom-0 right-0 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-blue-500 text-white shadow-lg"
+                    class="absolute bottom-0 right-2.5 flex h-7.5 w-7.5 cursor-pointer items-center justify-center rounded-full bg-blue-500 text-white shadow-lg"
                 >
                     <Camera size="19" />
 
@@ -209,7 +249,7 @@
                     <button
                         type="button"
                         onclick={cancelSelectedImage}
-                        class="absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white shadow-lg"
+                        class="absolute left-2.5 top-0 flex h-7.5 w-7.5 items-center justify-center rounded-full bg-red-500 text-white shadow-lg"
                     >
                         <X size="16" />
                     </button>
@@ -226,14 +266,14 @@
 
             <!-- Full name -->
             <div>
-                <label class="mb-2 block text-xs font-semibold text-gray-400">
+                <label for="full-name" class="mb-2 block text-xs font-semibold text-gray-400">
                     Full Name
                 </label>
 
                 <input
                     bind:value={fullName}
                     type="text"
-                    class="w-full rounded-xl border border-[#202D46] bg-[#0B1220] px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+                    class="w-full rounded-xl border border-[#202D46] bg-[#0B1220] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
             </div>
 
@@ -241,7 +281,7 @@
             <!-- Bio -->
             <div>
                 <div class="mb-2 flex justify-between">
-                    <label class="text-xs font-semibold text-gray-400">
+                    <label for="bio" class="text-xs font-semibold text-gray-400">
                         Bio
                     </label>
 
@@ -254,14 +294,14 @@
                     bind:value={bio}
                     maxlength="120"
                     rows="4"
-                    class="w-full resize-none rounded-xl border border-[#202D46] bg-[#0B1220] px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+                    class="w-full resize-none rounded-xl border border-[#202D46] bg-[#0B1220] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 ></textarea>
             </div>
 
 
             <!-- Email -->
             <div>
-                <label class="mb-2 block text-xs font-semibold text-gray-400">
+                <label for="email" class="mb-2 block text-xs font-semibold text-gray-400">
                     Email Address
                 </label>
 
@@ -269,7 +309,7 @@
                     value={email}
                     type="email"
                     disabled
-                    class="w-full cursor-not-allowed rounded-xl border border-[#202D46] bg-[#111827] px-4 py-3 text-sm text-gray-500"
+                    class="w-full cursor-not-allowed rounded-xl border border-[#202D46] bg-[#111827] px-4 py-3 text-base text-gray-500"
                 />
 
                 <p class="mt-2 text-[11px] text-gray-600">
@@ -296,14 +336,14 @@
 
             <!-- Username -->
             <div class="border-b border-[#202D46] pb-4">
-                <label class="mb-2 block text-xs text-gray-500">
+                <labe for="user-name" class="mb-2 block text-xs text-gray-500">
                     Username
-                </label>
+                </labe>
 
                 <input
                     bind:value={username}
                     type="text"
-                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-sm outline-none focus:border-blue-500"
+                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base outline-none focus:border-blue-500"
                 />
             </div>
 
@@ -311,7 +351,7 @@
             <!-- Date of birth -->
             <div class="border-b border-[#202D46] py-4">
 
-                <label class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                <label for="date-of -birth" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
                     <Calendar size="15" />
                     Date Of Birth
                 </label>
@@ -319,7 +359,7 @@
                 <input
                     bind:value={dateOfBirth}
                     type="date"
-                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
 
             </div>
@@ -328,7 +368,7 @@
             <!-- Gender -->
             <div class="border-b border-[#202D46] py-4">
 
-                <label class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                <label for="gender" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
                     <VenusAndMars size="15" />
                     Gender
                 </label>
@@ -348,15 +388,15 @@
             <!-- Language -->
             <div class="border-b border-[#202D46] py-4">
 
-                <label class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                <labe for="language" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
                     <Globe size="15" />
                     Language
-                </label>
+                </labe>
 
                 <input
                     bind:value={language}
                     type="text"
-                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
 
             </div>
@@ -365,15 +405,16 @@
             <!-- Title -->
             <div class="border-b border-[#202D46] py-4">
 
-                <label class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                <label for="title" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
                     <Briefcase size="15" />
                     Title
                 </label>
 
                 <input
                     bind:value={title}
+                    placeholder="MR / MRS"
                     type="text"
-                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
 
             </div>
@@ -382,7 +423,7 @@
             <!-- Website -->
             <div class="border-b border-[#202D46] py-4">
 
-                <label class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                <label for="website" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
                     <Link size="15" />
                     Website
                 </label>
@@ -391,7 +432,7 @@
                     bind:value={website}
                     type="url"
                     placeholder="https://..."
-                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
 
             </div>
@@ -400,16 +441,17 @@
             <!-- Facebook -->
             <div class="border-b border-[#202D46] py-4">
 
-                <label class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                <label for="facebook" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
                     <!-- <Facebook size="15" /> -->
+                     <p class="font-bold text-xl text-blue-600"><i>F</i></p>
                     Facebook
                 </label>
 
                 <input
                     bind:value={facebook}
                     type="url"
-                    placeholder="Facebook profile URL"
-                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+                    placeholder="Add Facebook profile URL"
+                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
 
             </div>
@@ -418,16 +460,21 @@
             <!-- Instagram -->
             <div class="border-b border-[#202D46] py-4">
 
-                <label class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                <label for="instagram" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
                     <!-- <Instagram size="15" /> -->
+                    <img
+                        src="/icons8-instagram-logo-94.png"
+                        alt="Instagram"
+                        class="h-5 w-5"
+                    />
                     Instagram
                 </label>
 
                 <input
                     bind:value={instagram}
                     type="url"
-                    placeholder="Instagram profile URL"
-                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+                    placeholder="Add Instagram profile URL"
+                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
 
             </div>
@@ -436,8 +483,12 @@
             <!-- WhatsApp -->
             <div class="py-4">
 
-                <label class="mb-2 flex items-center gap-2 text-xs text-gray-500">
-                    <MessageCircle size="15" />
+                <label for="whatsapp" class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                    <img
+                        src="/icons8-whatsapp-logo-94.png"
+                        alt="WhatsApp"
+                        class="h-5 w-5"
+                    />
                     WhatsApp
                 </label>
 
@@ -445,7 +496,7 @@
                     bind:value={whatsapp}
                     type="text"
                     placeholder="+234..."
-                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
 
             </div>

@@ -4,10 +4,11 @@ import { page } from '$app/state';
 import { goto } from '$app/navigation';
 import { ArrowLeft, Ban, Clock, MessageCircle, SquareArrowOutUpRight, VenusAndMars, Calendar, Globe} from 'lucide-svelte';
 import { onMount, onDestroy } from 'svelte';
+import { loadCurrentUser } from '$lib/services/auth';
 import { usersStore } from '$lib/stores/users';
 import { loadUsers } from '$lib/services/auth';
 import { findOrCreateConversation } from '$lib/services/auth';
-import { type UserState } from '$lib/stores/user'; 
+import { type UserState, userStore } from '$lib/stores/user'; 
 import { presenceMapStore } from '$lib/stores/presenceUsers';
 import { loadUsersPresence } from '$lib/services/presence';
 import { formatLastSeen } from '$lib/utils/lastSeen';
@@ -24,7 +25,7 @@ onMount(async () => {
 
     try {
         await loadUsers();
-
+        await loadCurrentUser()
         // Start listening for presence
         const users = $usersStore.users;
 
@@ -183,7 +184,7 @@ async function openChat(uid:string) {
                 </div>
 
                 <div>
-                    <a href={user.website} target="_blank" class="flex gap-3 items-center hover:underline text-blue-600">
+                    <a href={user.website} target="_blank" class="flex gap-3 items-center hover:underline text-blue-600 underline sm:no-underline">
                         {user.website}
                         <SquareArrowOutUpRight class="text-Lmuted" size="15"/>
                     </a>
@@ -200,7 +201,7 @@ async function openChat(uid:string) {
                 </div>
 
                 <div>
-                    <a href={user.facebook} target="_blank" class="flex gap-3 items-center hover:underline text-blue-600">
+                    <a href={user.facebook} target="_blank" class="flex gap-3 items-center hover:underline text-blue-600 underline sm:no-underline">
                         www.{user.username}.facebook.com
                         <SquareArrowOutUpRight class="text-Lmuted" size="15"/>
                     </a>
@@ -216,7 +217,8 @@ async function openChat(uid:string) {
                 </div>
 
                 <div>
-                    <a href={user.instagram} target="_blank" class="flex gap-3 items-center hover:underline text-blue-600">
+
+                    <a href={user.instagram} target="_blank" class="hover:underline text-blue-600 flex gap-3 items-center">
                         www.{user.username}.instagram.com
                         <SquareArrowOutUpRight class="text-Lmuted" size="15"/>
                     </a>
@@ -233,9 +235,12 @@ async function openChat(uid:string) {
                 </div>
 
                 <div>
-                    <a href={user.whatsapp} target="_blank" class="hover:underline text-blue-600 flex gap-3 items-center">
+                   <a href={`https://wa.me/${user.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hi ${user.username}, it's ${$userStore?.fullName} from Zingram.`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-blue-600 hover:underline"
+                    >
                         {user.whatsapp}
-                        <SquareArrowOutUpRight class="text-Lmuted" size="15"/>
                     </a>
                 </div>
 
@@ -340,7 +345,30 @@ async function openChat(uid:string) {
                 </p>
             {/if}
         </div>
-       
+
+         <!-- Member Since -->
+        <div class="flex relative justify-between pb-3 items-center border-b border-[#202D46] w-full">
+            <div class="flex gap-3 items-center">
+                <div- class="p-2 bg-[#172554] rounded-sm">
+                    <Calendar class="text-[#60A5FA]" strokeWidth="2.8" size='16'/>
+                </div->
+                <div>
+                    <p>Member Since</p>
+                </div>
+            </div>
+           <p class="capitalize">
+                {#if user.createdAt}
+                    {user.createdAt.toDate().toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric"
+                    }).replace(",", "")}
+                {:else}
+                    —
+                {/if}
+            </p>
+        </div>
+
     </div>
             
 

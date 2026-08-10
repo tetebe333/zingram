@@ -190,76 +190,76 @@ function openMyProfile() {
 
                 {@const conversationUser = conversationUsers[conversation.id]}
                 {@const unreadCount = conversation.unread?.[$userStore?.uid ?? ''] ?? 0}
-
-                <button 
-                onclick={()=>{ 
-                     if (longPressTriggered) {
-                            return;
-                        }
-                    goto(`/chat/${conversation.id}`);
-                    }}
-                oncontextmenu={(e) => {
-                        e.preventDefault();
-                        openContextMenu(conversationUser?.uid, conversation.id);
-                    }}
-                    ontouchstart={(e) => startLongPress(e, conversationUser?.uid, conversation.id)}
-                    ontouchend={cancelLongPress}
-                    ontouchmove={cancelLongPress}
-                    ontouchcancel={cancelLongPress}
-                class="flex w-full items-center justify-between gap-3 text-white border-b border-gray-800 py-4">
-                     <!-- Left side -->
-                    <div class="flex relative justify-start items-start gap-3">
-                        <img
-                            class="w-12 h-12 rounded-full object-cover shrink-0"
-                            src={conversationUser?.profileImage ?? '/male-avatar.PNG'}
-                            alt={conversationUser?.fullName ?? 'User'}
-                        >
-                        {#if $presenceMapStore[conversationUser?.uid]?.online}
-                            <div class="h-3 w-3 bg-green-500 rounded-full absolute top-8 left-9"></div>
-                        {/if}
-                        <div class="flex flex-col justify-start items-start">
-                            <!-- Full name -->
-                            <p class="font-semibold truncate capitalize">
-                                {conversationUser?.fullName ?? 'Unknown user'}
-                            </p>
+                {#if conversation.lastMessage}
+                     <button 
+                    onclick={()=>{ 
+                        if (longPressTriggered) {
+                                return;
+                            }
+                        goto(`/chat/${conversation.id}`);
+                        }}
+                    oncontextmenu={(e) => {
+                            e.preventDefault();
+                            openContextMenu(conversationUser?.uid, conversation.id);
+                        }}
+                        ontouchstart={(e) => startLongPress(e, conversationUser?.uid, conversation.id)}
+                        ontouchend={cancelLongPress}
+                        ontouchmove={cancelLongPress}
+                        ontouchcancel={cancelLongPress}
+                    class="flex w-full items-center justify-between gap-3 text-white border-b border-gray-800 py-4">
+                        <!-- Left side -->
+                        <div class="flex relative justify-start items-start gap-3">
+                            <img
+                                class="w-12 h-12 rounded-full object-cover shrink-0"
+                                src={conversationUser?.profileImage ?? '/male-avatar.PNG'}
+                                alt={conversationUser?.fullName ?? 'User'}
+                            >
                             {#if $presenceMapStore[conversationUser?.uid]?.online}
-                                <!-- Online / Last seen -->
-                                <p class="inline-flex items-center rounded-full  text-green-400 text-[11px] font-medium">
-                                    Online
-                                </p>
-                            {:else}
-                             <p class="text-xs font-semibold text-gray-500">
-                                Last seen {formatLastSeen($presenceMapStore[conversationUser?.uid]?.lastSeen)}
-                            </p>
+                                <div class="h-3 w-3 bg-green-500 rounded-full absolute top-8 left-9"></div>
                             {/if}
-                            <!-- Last message -->
-                            <p class="text-xs text-gray-500 truncate">
-                                {conversation.lastMessage ?? 'No message'}
-                            </p>
+                            <div class="flex flex-col justify-start items-start">
+                                <!-- Full name -->
+                                <p class="font-semibold truncate capitalize">
+                                    {conversationUser?.fullName ?? 'Unknown user'}
+                                </p>
+                                {#if $presenceMapStore[conversationUser?.uid]?.online}
+                                    <!-- Online / Last seen -->
+                                    <p class="inline-flex items-center rounded-full  text-green-400 text-[11px] font-medium">
+                                        Online
+                                    </p>
+                                {:else}
+                                <p class="text-xs font-semibold text-gray-500">
+                                    Last seen {formatLastSeen($presenceMapStore[conversationUser?.uid]?.lastSeen)}
+                                </p>
+                                {/if}
+                                <!-- Last message -->
+                                <p class="text-xs text-gray-500 truncate">
+                                    {conversation.lastMessage ?? 'No message'}
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                    <!-- Right side -->
-                    <div class="flex flex-col items-end justify-between self-stretch shrink-0">
+                        <!-- Right side -->
+                        <div class="flex flex-col items-end justify-between self-stretch shrink-0">
 
-                        <!-- Last message time -->
-                        <span
-                            class:text-green-400={unreadCount > 0}
-                            class:text-gray-500={unreadCount === 0}
-                            class="text-[11px]"
-                        >
-                            {formatLastTime(conversation.lastMessageTime)}
-                        </span>
-
-                        <!-- Unread counter -->
-                        {#if unreadCount > 0}
-                            <span class="flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-green-500 text-white text-[10px] font-bold">
-                                {unreadCount}
+                            <!-- Last message time -->
+                            <span
+                                class:text-green-400={unreadCount > 0}
+                                class:text-gray-500={unreadCount === 0}
+                                class="text-[11px]"
+                            >
+                                {formatLastTime(conversation.lastMessageTime)}
                             </span>
-                        {/if}
 
-                    </div>
-                </button>
+                            <!-- Unread counter -->
+                            {#if unreadCount > 0}
+                                <span class="flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-green-500 text-white text-[10px] font-bold">
+                                    {unreadCount}
+                                </span>
+                            {/if}
 
+                        </div>
+                    </button>
+                {/if}
             {/each}
 
         </div>

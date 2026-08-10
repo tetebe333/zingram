@@ -2,7 +2,20 @@
 import { goto } from "$app/navigation";
 import { Pencil, Camera, Mail, User, Calendar, VenusAndMars, Globe, BriefcaseBusiness, Link, LogOut, ShieldCheck } from "lucide-svelte";
 import { userStore } from "$lib/stores/user";
-import { formatLastSeen } from "$lib/utils/lastSeen";
+import { signOut } from 'firebase/auth';
+import { auth } from '$lib/firebase/firebase';
+import { setOffline } from "$lib/services/presence";
+
+async function logout() {
+    try {
+
+        await setOffline()
+        await signOut(auth);
+        goto('/login');
+    } catch (error) {
+        console.error('Logout failed:', error);
+    }
+}
 
 function openEditProfile() {
     goto("/edit-profile");
@@ -215,15 +228,21 @@ function openHome() {
                 <span>Title</span>
             </div>
 
-            <p class="text-gray-200">
-                {$userStore?.title ?? "—"}
-            </p>
+             {#if $userStore?.website}
+                <p class="text-gray-200">
+                    {$userStore?.title ?? "—"}
+                </p>
+            {:else}
+                <button onclick={openEditProfile}
+                class="text-gray-400 underline">
+                     Add title
+                 </button>
+            {/if}
 
         </div>
 
 
         <!-- Website -->
-        {#if $userStore?.website}
 
             <div class="flex justify-between py-4 items-center border-b border-[#202D46]">
 
@@ -232,21 +251,24 @@ function openHome() {
                     <span>Website</span>
                 </div>
 
-                <a
-                    href={$userStore.website}
-                    target="_blank"
-                    class="text-blue-400 hover:underline max-w-[55%] truncate"
-                >
-                    {$userStore.website}
-                </a>
+                {#if $userStore?.website}
+                    <a
+                        href={$userStore.website}
+                        target="_blank"
+                        class="text-blue-400 hover:underline max-w-[55%] truncate underline sm:no-underline"
+                    >
+                        {$userStore.website}
+                    </a>
+                {:else}
+                  <button onclick={openEditProfile} class="text-blue-400 underline max-w-[55%] truncate">Add website</button>
+                {/if}
 
             </div>
 
-        {/if}
 
 
         <!-- Facebook -->
-        {#if $userStore?.facebook}
+       
 
             <div class="flex justify-between py-4 items-center border-b border-[#202D46]">
 
@@ -259,22 +281,23 @@ function openHome() {
                     <span>Facebook</span>
                 </div>
 
-                <a
-                    href={$userStore.facebook}
-                    target="_blank"
-                    class="text-blue-400 hover:underline max-w-[55%] truncate"
-                >
-                    www.{$userStore.username}.facebook.com
-                </a>
+                 {#if $userStore?.facebook}
+                    <a
+                        href={$userStore.facebook}
+                        target="_blank"
+                        class="text-blue-400 hover:underline max-w-[55%] truncate underline sm:no-underline"
+                    >
+                        www.{$userStore.username}.facebook.com
+                    </a>
+                {:else}
+                    <button onclick={openEditProfile} class="text-blue-400 underline max-w-[55%] truncate">Add facebook</button>
+                {/if}
 
             </div>
 
-        {/if}
 
 
         <!-- Instagram -->
-        {#if $userStore?.instagram}
-
             <div class="flex justify-between py-4 items-center border-b border-[#202D46]">
 
                 <div class="flex gap-3 items-center text-gray-300">
@@ -285,23 +308,24 @@ function openHome() {
                     />
                     <span>Instagram</span>
                 </div>
+                {#if $userStore?.instagram}
+                    <a
+                        href={$userStore.instagram}
+                        target="_blank"
+                        class="text-blue-400 hover:underline max-w-[55%] truncate underline sm:no-underline"
+                    >
+                        www.{$userStore.username}.instagram.com
+                    </a>
+                {:else}
+                    <button onclick={openEditProfile} class="text-blue-400 underline max-w-[55%] truncate">Add instagram</button>
 
-                <a
-                    href={$userStore.instagram}
-                    target="_blank"
-                    class="text-blue-400 hover:underline max-w-[55%] truncate"
-                >
-                    www.{$userStore.username}.instagram.com
-                </a>
+                {/if}
 
             </div>
 
-        {/if}
 
 
         <!-- WhatsApp -->
-        {#if $userStore?.whatsapp}
-
             <div class="flex justify-between py-4 items-center border-b border-[#202D46]">
 
                 <div class="flex gap-3 items-center text-gray-300">
@@ -313,17 +337,20 @@ function openHome() {
                     <span>WhatsApp</span>
                 </div>
 
-                <a
-                    href={$userStore.whatsapp}
-                    target="_blank"
-                    class="text-blue-400 hover:underline max-w-[55%] truncate"
-                >
-                    {$userStore.whatsapp}
-                </a>
+                {#if $userStore?.whatsapp}
+                    <a
+                        href={`https://wa.me/${$userStore.whatsapp}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-blue-400 hover:underline max-w-[55%] truncate underline sm:no-underline"
+                    >
+                        {$userStore.whatsapp}
+                    </a>
+                {:else}
+                    <button onclick={openEditProfile} class="text-blue-400 underline max-w-[55%] truncate">Add whatsapp</button>
 
+                {/if}
             </div>
-
-        {/if}
 
 
         <!-- Member Since -->
@@ -334,9 +361,20 @@ function openHome() {
                 <span>Member Since</span>
             </div>
 
-            <p class="text-gray-200">
+          
+          <p class="text-gray-200 capitalize">
+            {#if $userStore?.createdAt}
+                {$userStore.createdAt.toDate().toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric"
+                }).replace(",", "")}
+            {:else}
                 —
-            </p>
+            {/if}
+        </p>
+
+             
 
         </div>
 
@@ -366,7 +404,7 @@ function openHome() {
 
 
     <!-- Logout -->
-    <button
+    <button onclick={logout}
         class="w-full mt-4 rounded-2xl border border-red-500/30 bg-red-500/5 px-4 py-5 flex items-center gap-4 text-left"
     >
 
