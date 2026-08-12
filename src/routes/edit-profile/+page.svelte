@@ -663,3 +663,23 @@ async function checkUsername() {
     {/if}
 
 </div>
+
+<style>
+    input[type="date"] {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    input[type="date"]::-webkit-date-and-time-value {
+        width: 100%;
+        text-align: left;
+    }
+
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(60%);
+        width: 20px;
+        height: 20px;
+    }
+</style>
