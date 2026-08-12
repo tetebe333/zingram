@@ -2,29 +2,24 @@
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { onMount } from 'svelte';
-	import { setOffline, startPresenceHeartbeat, stopPresenceHeartbeat } from '$lib/services/presence';
+	import { setOffline, setOnline} from '$lib/services/presence';
 	import { loadCurrentUser } from '$lib/services/auth';
 
 onMount(() => {
-   loadCurrentUser();
-   startPresenceHeartbeat();
-
-    let offlineTimer: ReturnType<typeof setTimeout> | null = null;
+    // User is online when the app starts
+    loadCurrentUser();
+    setOnline();
 
     const handleVisibilityChange = async () => {
-        if (document.visibilityState === 'hidden') {
-            offlineTimer = setTimeout(async () => {
-                await setOffline();
-                offlineTimer = null;
-            }, 30000);
-        } else {
-            if (offlineTimer) {
-                clearTimeout(offlineTimer);
-                offlineTimer = null;
-            }
 
+        if (document.visibilityState === 'hidden') {
+            // App left / went into background
+            await setOffline();
+
+        } else if (document.visibilityState === 'visible') {
+            // App came back
             await loadCurrentUser();
-            await startPresenceHeartbeat();
+            await setOnline();
         }
     };
 
@@ -34,12 +29,6 @@ onMount(() => {
     );
 
     return () => {
-        if (offlineTimer) {
-            clearTimeout(offlineTimer);
-        }
-
-        stopPresenceHeartbeat();
-
         document.removeEventListener(
             'visibilitychange',
             handleVisibilityChange

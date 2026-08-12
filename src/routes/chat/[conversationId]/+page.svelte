@@ -65,6 +65,7 @@ let chatUser = $state<UserState | null>(null);
 
 onMount(async () => {
 
+    setOnline();
     const conversation = await loadConversation(conversationId);
 
     unsubscribe = loadMessages(conversationId);
