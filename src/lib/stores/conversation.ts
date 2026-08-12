@@ -23,6 +23,8 @@ export interface ConversationState {
 
 export const ConversationStore =
     writable<ConversationState | null>(null);
-
 export const ConversationsStore =
     writable<ConversationState[]>([]);
+
+export const conversationsLoadedStore =
+    writable(false);

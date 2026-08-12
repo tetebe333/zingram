@@ -2,7 +2,7 @@
 import { auth, db } from '$lib/firebase/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { type RegisterUser } from '$lib/types/user'; // Inline type specifier resolves Vite bundling quirks
-import { collection, getDocs, getDoc, query, where, updateDoc, doc, serverTimestamp, setDoc, addDoc} from 'firebase/firestore';
+import { collection, onSnapshot, getDocs, getDoc, query, where, updateDoc, doc, serverTimestamp, setDoc, addDoc} from 'firebase/firestore';
 import { type UserState } from '$lib/stores/user'; 
 import { userStore } from '$lib/stores/user';
 import { audioStore } from '$lib/stores/audio';
@@ -164,35 +164,57 @@ export async function loadCurrentUser() {
         return userInfo;
     }
 
-    //getting all users from fire base
-    export async function loadUsers() {
-
+export function loadUsers(): Promise<() => void> {
+    return new Promise(async (resolve, reject) => {
         const currentUser = await waitForAuth();
 
         if (!currentUser) {
+            resolve(() => {});
             return;
         }
 
-        // Start loading
         usersStore.update((state) => ({
             ...state,
             loading: true
         }));
 
-        // Get all users
-        const snapshot = await getDocs(collection(db, 'users'));
+        let firstSnapshot = true;
 
-        const users = snapshot.docs
-            .map(doc => doc.data() as UserState)
-            .filter(user => user.uid !== currentUser.uid);
+        const unsubscribe = onSnapshot(
+            collection(db, 'users'),
+            (snapshot) => {
+                const users = snapshot.docs
+                    .map((doc) => doc.data() as UserState)
+                    .filter((user) => user.uid !== currentUser.uid);
 
-        // Save to store
-        usersStore.set({
-            users,
-            loading: false  
-        });
-    }
+                usersStore.set({
+                    users,
+                    loading: false
+                });
 
+                // Allow `await loadUsers()` to continue
+                // only after the first snapshot has arrived.
+                if (firstSnapshot) {
+                    firstSnapshot = false;
+                    resolve(unsubscribe);
+                }
+            },
+            (error) => {
+                console.error('Failed to listen for users:', error);
+
+                usersStore.update((state) => ({
+                    ...state,
+                    loading: false
+                }));
+
+                if (firstSnapshot) {
+                    firstSnapshot = false;
+                    reject(error);
+                }
+            }
+        );
+    });
+}
     //getting chat user data function
     export async function loadChatUser(uid: string) {
 

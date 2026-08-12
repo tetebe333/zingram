@@ -13,15 +13,20 @@ import { presenceMapStore } from '$lib/stores/presenceUsers';
 import { loadUsersPresence } from '$lib/services/presence';
 import { formatLastSeen } from '$lib/utils/lastSeen';
 import { loadMessages } from '$lib/services/messages';
-import { messagesStore } from '$lib/stores/messages';
+import { messagesStore, type MessageState } from '$lib/stores/messages';
 
 let unsubscribePresenceMap: (() => void) | undefined;
-let lastMessage = $derived($messagesStore.at(-1) ?? null);
 let unsubscribeMessages: (() => void) | undefined;
 
+let conversationId = $state<string | null>(null);
+
+let lastMessage = $derived(
+    conversationId
+        ? ($messagesStore[conversationId]?.at(-1) ?? null)
+        : null
+);
+
 onMount(async () => {
-    loadingUser = true;
-   
 
     try {
         await loadUsers();
@@ -35,6 +40,7 @@ onMount(async () => {
 
         // Get the conversation
         const conversation = await findOrCreateConversation(UserUid);
+        conversationId = conversation.id
 
         // Listen for messages in that conversation
         unsubscribeMessages = loadMessages(conversation.id);
@@ -86,16 +92,18 @@ async function openChat(uid:string) {
             <p class="text-gray-400 text-center">Loading Measages...</p>
         </div>
     {:else if user}
-        <div class="relative gap-3 bg-linear-to-br from-[#162443] via-[#0B1730] to-[#03081A] w-full flex justify-start items-start mt-3 rounded-2xl p-4">
+        <div class=" gap-3 bg-linear-to-br from-[#162443] via-[#0B1730] to-[#03081A] w-full flex justify-start items-start mt-3 rounded-2xl p-4">
+            <div class="shrink-0 relative">
                 <img
                     src={user.profileImage}
                     alt={user.fullName}
                     class="w-28 h-28 rounded-full"
                 />
-             
-            {#if $presenceMapStore[user.uid]?.online}
-              <div class="h-4 w-4 bg-green-500 rounded-full fixed top-38 left-27.5 shadow-2xs shadow-black/85"></div>     
-            {/if}
+                
+                {#if $presenceMapStore[user.uid]?.online}
+                <div class="h-4 w-4 bg-green-500 rounded-full absolute bottom-2 left-22 shadow-2xs shadow-black/85"></div>     
+                {/if}
+            </div>
             <div class="flex flex-col justify-start items-start gap-2">
                 <p class="text-white text-xl font-semibold capitalize">
                   {user.fullName}

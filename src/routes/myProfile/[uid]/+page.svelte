@@ -5,7 +5,8 @@ import { userStore } from "$lib/stores/user";
 import { signOut } from 'firebase/auth';
 import { auth } from '$lib/firebase/firebase';
 import { setOffline } from "$lib/services/presence";
-
+import { onMount } from "svelte";
+import { loadCurrentUser } from "$lib/services/auth";
 async function logout() {
     try {
 
@@ -16,6 +17,11 @@ async function logout() {
         console.error('Logout failed:', error);
     }
 }
+
+onMount(async () => {
+    await loadCurrentUser()
+})
+
 
 function openEditProfile() {
     goto("/edit-profile");
@@ -107,7 +113,7 @@ function openHome() {
 
             <div class="flex flex-col">
                 <p class="text-white text-sm font-medium">
-                    {$userStore?.email ?? "ftbjf@gmail.com"}
+                    {$userStore?.email ?? "user@gmail.com"}
                 </p>
 
                 <p class="text-xs text-gray-400 mt-1">

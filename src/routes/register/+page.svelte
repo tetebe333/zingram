@@ -39,12 +39,8 @@ let registerError = $state('');
 let isLoading = $state(false);
 let confirmPassword = $state('');
 let showPassword = $state(false);
-let dateInput: HTMLInputElement;
 let confirmpasswordIsValid = $state(true);
 // Function to open the date picker
-function openPicker(){
-    dateInput.showPicker();
-}
 
 function validateConfirmPassword() {
     if (confirmPassword && user.password !== confirmPassword) {
@@ -182,12 +178,16 @@ async function handleRegister(event: Event) {
                 <div class="flex gap-2 justify-between">
                     <!-- Date of Birth -->
                     <div class="relative w-full">
-                        <CalendarDays  class="input-icon" size="18"/>
-                        <button type="button" onclick={openPicker} class="input-field w-full text-left text-gray-500 font-semibold">
-                            {user.dob ? user.dob : 'Date of Birth'}
-                        </button>
-                        <input type="date" bind:this={dateInput} bind:value={user.dob} class="absolute opacity-0 pointer-events-none" required />
-                     </div>
+                        <CalendarDays class="input-icon" size="18"/>
+
+                        <input
+                            type="date"
+                            bind:value={user.dob}
+                            name="dob"
+                            class="input-field w-full text-gray-500 font-semibold"
+                            required
+                        />
+                    </div>
 
                      <!-- Gender -->
                     <div class="relative w-full">

@@ -1,6 +1,6 @@
 
 import { db } from "$lib/firebase/firebase";
-import { messagesStore, type MessageState } from "$lib/stores/messages";
+import { messagesStore, type MessageState, messagesLoadedStore } from "$lib/stores/messages";
 
 import {
     collection,
@@ -25,9 +25,15 @@ export function loadMessages(conversationId: string) {
             ...doc.data()
         })) as MessageState[];
 
-        messagesStore.set(messages);
+        messagesStore.update((current) => ({
+            ...current,
+            [conversationId]: messages
+        }));
 
-        
+        messagesLoadedStore.update((current) => ({
+            ...current,
+            [conversationId]: true
+        }));
 
     });
 

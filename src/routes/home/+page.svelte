@@ -14,15 +14,16 @@ import { usersStore } from '$lib/stores/users';
 import { ConversationsStore } from '$lib/stores/conversation';
 import { loadCurrentUser, loadUsers} from '$lib/services/auth';
 import { loadConversations} from '$lib/services/chat';
-import { loadConversationUser } from '$lib/services/chat';
+import { loadMessages } from '$lib/services/messages';
 import { loadUsersPresence } from "$lib/services/presence";
 import { presenceMapStore } from '$lib/stores/presenceUsers';
 import { formatLastSeen, formatLastTime} from '$lib/utils/lastSeen';
 
 let unsubscribePresenceMap: (() => void) | undefined;
 let unsubscribeConversations: (() => void) | undefined;
+let unsubscribeMessages: (() => void) [] = [];
+
 let isLoading = $state(false);
-let conversationUsers = $state<Record<string, UserState>>({});
 //right click
 let selectedUserID = $state<string | null>(null);
 let showContextMenu = $state(false);
@@ -30,6 +31,7 @@ let longPressTimer: ReturnType<typeof setTimeout> | undefined;
 let longPressTriggered = false;
 let selctedConversationId = $state<string | null>(null);
 let search = $state('')
+
 
 function startLongPress(event: TouchEvent, userId: string, selctedConversationIdP: string ) {
     longPressTriggered = false;
@@ -61,26 +63,15 @@ function closeContextMenu() {
     selctedConversationId = null;
     selectedUserID = null;
 }
-async function loadConversationUsers() {
-    if (!$userStore?.uid) return;
 
-    const conversations = $ConversationsStore;
-
-    for (const conversation of conversations) {
-        const conversationUser = await loadConversationUser(
-            conversation.participants,
-            $userStore,
-        );
-
-        if (conversationUser) {
-            conversationUsers[conversation.id] = conversationUser;
-        }
-    }
-}
 
 const filteredConversations = $derived(
     $ConversationsStore.filter((conversation) => {
-        const conversationUser = conversationUsers[conversation.id];
+        const conversationUser = $usersStore.users.find(
+            (user) =>
+                conversation.participants.includes(user.uid) &&
+                user.uid !== $userStore?.uid
+        );
 
         if (!conversationUser) return false;
 
@@ -97,23 +88,36 @@ onMount(async () => {
     isLoading = true;
 
     try {
-        await loadCurrentUser();
+        // Load current user
+        if (!$userStore?.uid) {
+            await loadCurrentUser();
+        }
 
-        await loadUsers();
+        // Load users
+        if ($usersStore.users.length === 0) {
+            await loadUsers();
+        }
 
         const users = $usersStore.users;
 
+        // Start presence listener
         unsubscribePresenceMap = loadUsersPresence(
             users.map((u) => u.uid)
         );
 
+        // Start conversations listener
         unsubscribeConversations = await loadConversations();
 
-        // ConversationsStore now has conversations
-        await loadConversationUsers();
+        // Start loading messages for existing conversations in the background
+        unsubscribeMessages = $ConversationsStore.map((conversation) =>
+            loadMessages(conversation.id)
+        );
 
     } catch (error) {
-        console.log(error);
+        console.error(
+            'Failed to initialize home screen:',
+            error
+        );
     } finally {
         isLoading = false;
     }
@@ -121,6 +125,10 @@ onMount(async () => {
 onDestroy(() => {
     unsubscribeConversations?.();
     unsubscribePresenceMap?.();
+
+    unsubscribeMessages.forEach((unsubscribe) => {
+        unsubscribe();
+    });
 });
 function openMyProfile() {
     if (!$userStore?.uid) return;
@@ -132,6 +140,15 @@ function openMyProfile() {
 
 
 <div class="relative"> 
+
+    {#if isLoading}
+
+    <div class="fixed inset-0 flex items-center justify-center bg-[#010713] z-50 gap-2">
+        <div class="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
+        <p class="text-gray-400 text-center">loading conversations...</p>
+    </div>
+
+{:else}
     <div class="fixed z-20 w-full">
         <div class="flex justify-between px-7 pt-8">
             <h1 class="text-2xl font-bold text-white"><span class="text-blue-500">C</span>hats</h1>
@@ -150,12 +167,7 @@ function openMyProfile() {
         </div>
     </div>
     
-    {#if isLoading}
-         <div class="flex pt-60 justify-center items-center gap-2">
-            <div class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
-            <p class="text-gray-400 text-center">Loading conversations...</p>
-        </div>
-     {:else}
+   
         {#if $ConversationsStore.length === 0}
 
             <div class="flex-col justify-center gap-1 py-50 text-center">
@@ -188,7 +200,11 @@ function openMyProfile() {
 
             {#each filteredConversations as conversation}
 
-                {@const conversationUser = conversationUsers[conversation.id]}
+                {@const conversationUser = $usersStore.users.find(
+                    (user) =>
+                        conversation.participants.includes(user.uid) &&
+                        user.uid !== $userStore?.uid
+                )}
                 {@const unreadCount = conversation.unread?.[$userStore?.uid ?? ''] ?? 0}
                 {#if conversation.lastMessage}
                      <button 
@@ -200,9 +216,9 @@ function openMyProfile() {
                         }}
                     oncontextmenu={(e) => {
                             e.preventDefault();
-                            openContextMenu(conversationUser?.uid, conversation.id);
+                            openContextMenu(conversationUser!.uid, conversation.id);
                         }}
-                        ontouchstart={(e) => startLongPress(e, conversationUser?.uid, conversation.id)}
+                        ontouchstart={(e) => startLongPress(e, conversationUser!.uid, conversation.id)}
                         ontouchend={cancelLongPress}
                         ontouchmove={cancelLongPress}
                         ontouchcancel={cancelLongPress}
@@ -214,7 +230,7 @@ function openMyProfile() {
                                 src={conversationUser?.profileImage ?? '/male-avatar.PNG'}
                                 alt={conversationUser?.fullName ?? 'User'}
                             >
-                            {#if $presenceMapStore[conversationUser?.uid]?.online}
+                            {#if $presenceMapStore[conversationUser!.uid]?.online}
                                 <div class="h-3 w-3 bg-green-500 rounded-full absolute top-8 left-9"></div>
                             {/if}
                             <div class="flex flex-col justify-start items-start">
@@ -222,14 +238,14 @@ function openMyProfile() {
                                 <p class="font-semibold truncate capitalize">
                                     {conversationUser?.fullName ?? 'Unknown user'}
                                 </p>
-                                {#if $presenceMapStore[conversationUser?.uid]?.online}
+                                {#if $presenceMapStore[conversationUser!.uid]?.online}
                                     <!-- Online / Last seen -->
                                     <p class="inline-flex items-center rounded-full  text-green-400 text-[11px] font-medium">
                                         Online
                                     </p>
                                 {:else}
                                 <p class="text-xs font-semibold text-gray-500">
-                                    Last seen {formatLastSeen($presenceMapStore[conversationUser?.uid]?.lastSeen)}
+                                    Last seen {formatLastSeen($presenceMapStore[conversationUser!.uid]?.lastSeen)}
                                 </p>
                                 {/if}
                                 <!-- Last message -->
@@ -264,7 +280,7 @@ function openMyProfile() {
 
         </div>
         {/if}
-    {/if}
+    
 
 
     <div class="fixed right-5 z-10 bottom-38">
@@ -352,7 +368,7 @@ function openMyProfile() {
 
         </biv>
     {/if}
-
+{/if}
 </div>
 
 

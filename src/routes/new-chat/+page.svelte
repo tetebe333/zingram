@@ -13,17 +13,31 @@ import { presenceMapStore } from '$lib/stores/presenceUsers';
 
 let unsubscribePresenceMap: (() => void) | undefined;
 let istLoading = $state(false)
-onMount(async () => {
-    istLoading = true
-    await loadUsers();
-    await tick();
 
-    const users = $usersStore.users;
+ onMount(async () => {
+    istLoading = true;
 
-    unsubscribePresenceMap = loadUsersPresence(
-        users.map((u) => u.uid)
-    );
-    istLoading = false
+    try {
+       
+        if ($usersStore.users.length === 0) {
+            await loadUsers();
+        }
+
+        const users = $usersStore.users;
+
+        // Start presence listener
+        unsubscribePresenceMap = loadUsersPresence(
+            users.map((u) => u.uid)
+        );
+
+    } catch (error) {
+        console.error(
+            'Failed to initialize new chat screen:',
+            error
+        );
+    } finally {
+        istLoading = false;
+    }
 });
 
 onDestroy(() => {

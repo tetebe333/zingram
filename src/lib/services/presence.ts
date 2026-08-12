@@ -145,3 +145,26 @@ export function loadUsersPresence(uids: string[]) {
         unsubscribers.forEach((unsub) => unsub());
     };
 }
+
+let presenceHeartbeat: ReturnType<typeof setInterval> | null = null;
+
+export async function startPresenceHeartbeat() {
+    if (presenceHeartbeat) return;
+
+    await setOnline();
+
+    presenceHeartbeat = setInterval(async () => {
+        try {
+            await updateLastSeen();
+        } catch (error) {
+            console.error('Failed to update presence:', error);
+        }
+    }, 15000);
+}
+
+export function stopPresenceHeartbeat() {
+    if (presenceHeartbeat) {
+        clearInterval(presenceHeartbeat);
+        presenceHeartbeat = null;
+    }
+}

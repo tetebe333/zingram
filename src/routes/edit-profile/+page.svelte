@@ -18,7 +18,7 @@
     import { doc, updateDoc } from 'firebase/firestore';
     import { db } from '$lib/firebase/firebase';
 
-    let isLoading = $state(true);
+    let isLoading = $state(false);
     let isSaving = $state(false);
 
     let fullName = $state('');
@@ -40,7 +40,6 @@
 
     onMount(async () => {
         try {
-            await loadCurrentUser();
 
             if ($userStore) {
                 fullName = $userStore.fullName ?? '';
@@ -59,6 +58,7 @@
                 profileImage =
                     $userStore.profileImage ?? '/icons8-user-64.png';
             }
+            await loadCurrentUser();
         } catch (error) {
             console.error('Failed to load current user:', error);
         } finally {

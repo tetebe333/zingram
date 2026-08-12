@@ -6,11 +6,12 @@ ArrowLeft, MessageCircleMore, ChevronDown, Plus, Ban, SquarePen, Camera, Mic , I
 import { page }  from '$app/state' 
 import {onMount, onDestroy, tick}  from 'svelte'
 import { loadConversation, sendMessage, deleteMessage, editMessage, listenAndClearUnread} from '$lib/services/chat'
-import {chatUserStore} from '$lib/stores/chatUser'
 import { auth } from '$lib/firebase/firebase';
-import { loadChatUser } from '$lib/services/auth';
+import { type UserState } from '$lib/stores/user';
+import { loadUsers } from '$lib/services/auth';
+import { usersStore } from '$lib/stores/users';
 import { loadMessages } from '$lib/services/messages';
-import { messagesStore } from '$lib/stores/messages';
+import { messagesStore, type MessageState } from '$lib/stores/messages';
 import { uploadAudio, uploadImage, uploadVideo, uploadDocument} from '$lib/services/cloudinary';
 import { presenceStore } from '$lib/stores/presence';
 import { loadUserPresence, setTyping, setRecording, setOnline } from '$lib/services/presence';
@@ -23,6 +24,10 @@ let unsubscribeUnread: (() => void) | undefined
 let unsubscribePresence: (() => void) | undefined
 
 const conversationId = $derived(page.params.conversationId as string);
+const currentMessages = $derived(
+    $messagesStore[conversationId] ?? []
+);
+
 
 function scrollToBottom() {
     if (!messageContainer) return;
@@ -38,44 +43,35 @@ $effect(() => {
     let previousMessageCount = 0;
 
     $effect(() => {
-        const messages = $messagesStore;
+        const messages = currentMessages;
 
         if (messages.length > previousMessageCount) {
-
             tick().then(() => {
-
                 if (isAtBottom) {
-
                     requestAnimationFrame(() => {
                         scrollToBottom();
                     });
-
                 } else {
-
                     showScrollToBottom = true;
-
                 }
-
             });
-
         }
 
         previousMessageCount = messages.length;
     });
 });
 
+let chatUser = $state<UserState | null>(null);
+
 onMount(async () => {
-    loadingProfile = true;
 
     const conversation = await loadConversation(conversationId);
 
-    // Load all messages
     unsubscribe = loadMessages(conversationId);
 
     const currentUid = auth.currentUser?.uid;
 
     if (!currentUid) {
-        loadingProfile = false;
         return;
     }
 
@@ -84,23 +80,34 @@ onMount(async () => {
         currentUid
     );
 
-    // Getting chat user info
     const otherUserUid = conversation.participants.find(
         uid => uid !== currentUid
     );
 
     if (otherUserUid) {
-        // Load other user's profile
-        await loadChatUser(otherUserUid);
+        // 1️⃣ First: use whatever users are already loaded
+        chatUser = $usersStore.users.find(
+            user => user.uid === otherUserUid
+        ) ?? null;
 
-        // Start listening to their presence
+        console.log('Initial chat user:', chatUser);
+
         unsubscribePresence = loadUserPresence(otherUserUid);
     }
 
-    loadingProfile = false;
-
     await tick();
     scrollToBottom();
+
+    await loadUsers();
+
+    // 3️⃣ After loading: find the user again
+    if (otherUserUid) {
+        chatUser = $usersStore.users.find(
+            user => user.uid === otherUserUid
+        ) ?? null;
+
+        console.log('Updated chat user:', chatUser);
+    }
 });
 
 onDestroy(() => {
@@ -227,7 +234,7 @@ let isTyping = $state(false);
 
 //message menu
 let showMessageMenu = $state(false);
-let selectedMessage = $state<any>(null);
+let selectedMessage = $state<MessageState | null>(null);
 
 let menuX = $state(0);
 let menuY = $state(0);
@@ -242,7 +249,7 @@ let showScrollToBottom = $state(false);
 let isAtBottom = $state(true);
 
 //edit state
-let editingMessage = $state<any | null>(null);
+let editingMessage = $state<MessageState | null>(null);
 let originalEditingText = $state('');
 let editingMessageText = $state('');
 let discardEdit = $state(false);
@@ -673,7 +680,7 @@ function startMessageAudioTimer() {
 }
 
 //play normal chat audio
-function toggleMessageAudio(message: any) {
+function toggleMessageAudio(message: MessageState) {
 
     if (!message.fileUrl) return;
 
@@ -927,7 +934,7 @@ async function handleTyping() {
     }, 2000);
 }
 
-function openMessageMenu(event: MouseEvent, message: any) {
+function openMessageMenu(event: MouseEvent, message: MessageState) {
     event.preventDefault();
 
     selectedMessage = message;
@@ -969,7 +976,7 @@ function closeMessageMenu() {
     selectedMessage = null;
 }
 
-function canEditMessage(message: any) {
+function canEditMessage(message: MessageState) {
     // Deleted messages can never be edited
     if (message.type === "deleted") return false;
 
@@ -998,7 +1005,7 @@ function checkIfAtBottom() {
     }
 }
 
-function startEditMessage(message: any) {
+function startEditMessage(message: MessageState) {
 
     if (!message) return;
 
@@ -1055,7 +1062,7 @@ async function handleUpdateMessage() {
     }
 }
 
-function startLongPress(event: TouchEvent, message: any) {
+function startLongPress(event: TouchEvent, message: MessageState) {
     longPressTriggered = false;
 
     longPressTimer = setTimeout(() => {
@@ -1113,12 +1120,12 @@ function cancelLongPress() {
                         <ArrowLeft   size="22"/>
                     </a>
                 
-                    <div onclick={() => goto(`/user/${$chatUserStore?.uid}`)}
+                    <div onclick={() => goto(`/user/${chatUser?.uid}`)}
                     class="flex gap-4">
-                        <img class="w-12 h-12 rounded-full" src={$chatUserStore?.profileImage ?? '/male-avatar.PNG'} alt="avata">
+                        <img class="w-12 h-12 rounded-full" src={chatUser?.profileImage ?? '/male-avatar.PNG'} alt="avata">
                         <div>
-                            <p class="text-sm font-semibold text-gray-300">{$chatUserStore?.fullName}</p>
-                            <p class="text-xs font-semibold text-gray-500">{$chatUserStore?.username}</p>
+                            <p class="text-sm font-semibold text-gray-300">{chatUser?.fullName ?? ''}</p>
+                            <p class="text-xs font-semibold text-gray-500">{chatUser?.username ?? ''}</p>
                             {#if $presenceStore.typing && $presenceStore.currentConversationId === page.params.conversationId}
                             <p class="text-xs font-semibold text-blue-500">
                                 Typing...
@@ -1143,11 +1150,11 @@ function cancelLongPress() {
                         </div>
                     </div>
                     {#if $presenceStore?.online}
-                    <div class="h-3 w-3 bg-green-500 rounded-full absolute top-15 left-22"></div>
+                    <div class="h-3 w-3 bg-green-500 rounded-full absolute top-12 left-22"></div>
                     {/if}
                 </div>
             </div>
-            <div onclick={() => goto(`/user/${$chatUserStore?.uid}`)}
+            <div onclick={() => goto(`/user/${chatUser?.uid}`)}
             class="mt-3 h-8 w-8 rounded-full bg-blue-600 flex justify-center items-center text-2xl font-semibold text-gray-300">
                 <i><p>i</p></i>
             </div>
@@ -1162,7 +1169,7 @@ function cancelLongPress() {
                 <p class="text-gray-400 text-center">Loading Measages...</p>
         </div>
     {:else}
-    {#if $messagesStore.length === 0}
+    {#if currentMessages.length === 0}
         <div class="flex-col justify-center items-center text-center gap-2 pt-60">
                 <p class="flex justify-center items-center text-center mb-12"><span><MessageCircleMore class="text-[#2f3e69] "  size="100"/></span></p>
                 <h1 class="text-2xl font-bold text-white -mt-10">No conversations yet</h1>
@@ -1178,7 +1185,7 @@ function cancelLongPress() {
     [-ms-overflow-style:none]
     scrollbar-none"
 >
-        {#each $messagesStore as message}
+        {#each currentMessages as message}
 
             {#if message.senderId === auth.currentUser?.uid}
 
@@ -1959,8 +1966,8 @@ function cancelLongPress() {
 
             {:else}
 
-                {#if canEditMessage(selectedMessage) && selectedMessage?.text !== null}
-                    <button onclick={()=>startEditMessage(selectedMessage)}
+                {#if canEditMessage(selectedMessage!) && selectedMessage?.text !== null}
+                    <button onclick={()=>startEditMessage(selectedMessage!)}
                         class="w-full px-4 py-3 hover:bg-white/5 transition flex items-center gap-2"
                     >
                         <SquarePen size="17" />

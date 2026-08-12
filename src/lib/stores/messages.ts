@@ -12,10 +12,13 @@ export interface MessageState {
     text: string | null;
 
     fileUrl: string | null;
-    duration: number| null;
+    duration: number | null;
     createdAt: any;
     editedAt: any;
     deletedAt: any;
 }
+export const messagesStore =
+    writable<Record<string, MessageState[]>>({});
 
-export const messagesStore = writable<MessageState[]>([]);
+export const messagesLoadedStore =
+    writable<Record<string, boolean>>({});

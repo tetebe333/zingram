@@ -1,6 +1,6 @@
 import { db,  auth } from '$lib/firebase/firebase';
 import { doc,  orderBy, getDoc, onSnapshot, collection, addDoc, updateDoc, serverTimestamp, deleteField, where, query, getDocs } from 'firebase/firestore';
-import { ConversationStore, ConversationsStore, type ConversationState } from '$lib/stores/conversation';
+import { ConversationStore, ConversationsStore, type ConversationState, conversationsLoadedStore } from '$lib/stores/conversation';
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { loadUsers } from './auth';
 import { type UserState } from '$lib/stores/user'; 
@@ -56,8 +56,6 @@ export async function loadConversations() {
     );
 
     return new Promise<() => void>((resolve) => {
-        let firstSnapshot = true;
-
         const unsubscribe = onSnapshot(
             conversationsQuery,
             (snapshot) => {
@@ -67,15 +65,22 @@ export async function loadConversations() {
                         ...doc.data()
                     } as ConversationState));
 
+                // Update the realtime store
                 ConversationsStore.set(conversations);
 
-                if (firstSnapshot) {
-                    firstSnapshot = false;
-                    resolve(unsubscribe);
-                }
+                // Tell the UI that the first snapshot has arrived
+                conversationsLoadedStore.set(true);
+
+                // Resolve only once with the listener
+                resolve(unsubscribe);
             },
             (error) => {
-                console.error("Error listening to conversations:", error);
+                console.error(
+                    "Error listening to conversations:",
+                    error
+                );
+
+                conversationsLoadedStore.set(true);
             }
         );
     });
