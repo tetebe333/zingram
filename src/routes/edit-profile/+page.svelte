@@ -17,6 +17,8 @@
     import { uploadImage } from '$lib/services/cloudinary';
     import { doc, updateDoc } from 'firebase/firestore';
     import { db } from '$lib/firebase/firebase';
+    import { userNameExist} from '$lib/services/auth';
+
 
     let isLoading = $state(false);
     let isSaving = $state(false);
@@ -38,27 +40,46 @@
     let selectedImage = $state<File | null>(null);
     let previewImage = $state<string | null>(null);
 
+    let usernameTimeout: ReturnType<typeof setTimeout>;
+    let usernameMessage = $state('');
+    let usernameAvailable = $state(false);
     onMount(async () => {
         try {
 
-            if ($userStore) {
-                fullName = $userStore.fullName ?? '';
-                username = $userStore.username ?? '';
-                bio = $userStore.bio ?? '';
-                email = $userStore.email ?? '';
-                dateOfBirth = $userStore.dateOfBirth ?? '';
-                gender = $userStore.gender ?? '';
-                language = $userStore.language ?? '';
-                title = $userStore.title ?? '';
-                website = $userStore.website ?? '';
-                facebook = $userStore.facebook ?? '';
-                instagram = $userStore.instagram ?? '';
-                whatsapp = $userStore.whatsapp ?? '';
+                fullName = $userStore?.fullName ?? '';
+                username = $userStore?.username ?? '';
+                bio = $userStore?.bio ?? '';
+                email = $userStore?.email ?? '';
+                dateOfBirth = $userStore?.dateOfBirth ?? '';
+                gender = $userStore?.gender ?? '';
+                language = $userStore?.language ?? '';
+                title = $userStore?.title ?? '';
+                website = $userStore?.website ?? '';
+                facebook = $userStore?.facebook ?? '';
+                instagram = $userStore?.instagram ?? '';
+                whatsapp = $userStore?.whatsapp ?? '';
 
                 profileImage =
-                    $userStore.profileImage ?? '/icons8-user-64.png';
-            }
+                    $userStore?.profileImage ?? '/male-avatar.PNG';
+
             await loadCurrentUser();
+            if ($userStore) {
+                fullName = $userStore.fullName;
+                username = $userStore.username;
+                bio = $userStore.bio;
+                email = $userStore.email;
+                dateOfBirth = $userStore.dateOfBirth;
+                gender = $userStore.gender;
+                language = $userStore.language;
+                title = $userStore.title;
+                website = $userStore.website;
+                facebook = $userStore.facebook;
+                instagram = $userStore.instagram;
+                whatsapp = $userStore.whatsapp;
+
+                profileImage =
+                    $userStore.profileImage ?? '/male-avatar.PNG';
+            }
         } catch (error) {
             console.error('Failed to load current user:', error);
         } finally {
@@ -99,11 +120,42 @@
         goto(`/myProfile/${$userStore.uid}`);
     }
 
+async function checkUsername() {
+	usernameMessage = "";
+	usernameAvailable = false;
+
+	clearTimeout(usernameTimeout);
+
+	if (username.trim() == '') return;
+
+	usernameTimeout = setTimeout(async () => {
+		const exists = await userNameExist(username);
+
+		if (exists && username !== $userStore?.username) {
+			usernameMessage = "❌ Username already exists";
+		} else {
+			usernameMessage = "✅ Username available";
+			usernameAvailable = true;
+		}
+	}, 500);
+}
+
+
     async function saveProfile() {
         if (!$userStore?.uid || isSaving) return;
 
+
         try {
             isSaving = true;
+            //checking user name befer registaring the user
+            const exists = await userNameExist(username)
+            if (exists && username !== $userStore.username) {
+            usernameMessage = '❌ Username already existd'
+            window.alert('❌ Username already existd');
+            isSaving = false;
+            return;  
+            }
+           
 
             let updatedProfileImage = profileImage;
 
@@ -372,12 +424,22 @@
                 <input
                     id="user-name"
                     bind:value={username}
+                    oninput={checkUsername}
                     type="text"
                     autocomplete="username"
                     class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
 
             </div>
+             {#if usernameMessage}
+                    <p
+                        class="mt-1 text-left text-xs font-medium"
+                        class:text-green-500={usernameAvailable}
+                        class:text-red-500={!usernameAvailable}
+                    >
+                      {usernameMessage}
+                    </p>
+            {/if}
 
 
             <!-- Date of birth -->
@@ -580,7 +642,7 @@
             type="button"
             onclick={saveProfile}
             disabled={isSaving}
-            class="mt-7 flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-4 text-base font-bold text-white shadow-[0_0_30px_rgba(37,99,235,.25)] disabled:cursor-not-allowed disabled:opacity-50"
+            class="log-btn font-semibold w-full mt-3 flex items-center justify-center gap-2"
         >
             {#if isSaving}
 

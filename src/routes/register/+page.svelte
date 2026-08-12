@@ -72,9 +72,7 @@ async function checkUsername() {
 
 async function handleRegister(event: Event) {
     event.preventDefault(); 
-    // Perform form validation and submission logic here
-    console.log('User Info:', user);
-    // You can call your registerUser function here to send the data to the server
+    
     try {
 
         validateConfirmPassword();
@@ -82,17 +80,16 @@ async function handleRegister(event: Event) {
             return;
         }
 
-        
+        // Start loading state
+        isLoading = true;
         //checking user name befer registaring the user
         const exists = await userNameExist(user.username)
         if (exists) {
-           usernameMessage = '❌ User already existd'
+           usernameMessage = '❌ Username already existd';
+           window.alert('❌ Username already existd');
            return;  
         }
 
-
-        // Start loading state
-        isLoading = true;
 
          //setting user avatar
         user.avatar = user.gender === 'male' ? maleAvatar : femaleAvatar;
@@ -161,21 +158,22 @@ async function handleRegister(event: Event) {
                 </div>
 
                 {#if usernameMessage}
-                <p
-                    class="mt-1 text-left text-xs font-medium"
-                    class:text-green-500={usernameAvailable}
-                    class:text-red-500={!usernameAvailable}
-                >
-                {usernameMessage}
+                    <p
+                        class="mt-1 text-left text-xs font-medium"
+                        class:text-green-500={usernameAvailable}
+                        class:text-red-500={!usernameAvailable}
+                    >
+                      {usernameMessage}
                     </p>
                 {/if}
+
                  <!-- Email -->
                 <div class="relative">
                     <Mail class="input-icon" size="18"/>
                     <input type="email" bind:value={user.email} name="email" placeholder="Email" class="input-field w-full" required />
                 </div>
 
-                <div class="flex gap-2 justify-between">
+                <!-- <div class="flex gap-2 justify-between"> -->
                     <!-- Date of Birth -->
                     <div class="relative w-full">
                         <CalendarDays class="input-icon" size="18"/>
@@ -200,7 +198,7 @@ async function handleRegister(event: Event) {
                             <option class="text-gray-500" value="female">Female</option>
                         </select>
                     </div>
-                </div>
+                <!-- </div> -->
 
                 <!-- Password -->
                 <div class="relative">
@@ -276,3 +274,11 @@ async function handleRegister(event: Event) {
     </div>
     
 </AuthBackground>
+
+<style>
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(60%);
+        width: 20px;
+        height: 20px;
+    }
+</style>
