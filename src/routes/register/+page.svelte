@@ -21,7 +21,7 @@ import { registerUser, userNameExist} from '$lib/services/auth';
 const user = $state({
     fullName: '',
     username: '',
-    dob: '',
+    dob: '2000-12-24',
     email: '',
     password: '',
     avatar: '',
