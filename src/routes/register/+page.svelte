@@ -175,7 +175,7 @@ async function handleRegister(event: Event) {
 
                 <div class="flex gap-2 justify-between min-w-0">
                     <!-- Date of Birth -->
-                    <div class="relative w-full min-w-0">
+                    <div class="relative w-94 min-w-0">
                         <CalendarDays class="input-icon" size="18"/>
 
                         <input
