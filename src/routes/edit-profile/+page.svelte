@@ -457,7 +457,7 @@ async function checkUsername() {
                     id="date-of-birth"
                     bind:value={dateOfBirth}
                     type="date"
-                    class="w-full rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
+                    class="rounded-xl border border-[#202D46] bg-[#101827] px-4 py-3 text-base text-white outline-none focus:border-blue-500"
                 />
 
             </div>
@@ -664,22 +664,37 @@ async function checkUsername() {
 
 </div>
 
+
 <style>
     input[type="date"] {
+        -webkit-appearance: none;
+        appearance: none;
+        display: block;
         width: 100%;
         min-width: 0;
         max-width: 100%;
         box-sizing: border-box;
+        font-size: 16px;
+        color: #6b7280;
     }
 
     input[type="date"]::-webkit-date-and-time-value {
         width: 100%;
         text-align: left;
+        color: #6b7280;
+    }
+
+    input[type="date"]::-webkit-datetime-edit,
+    input[type="date"]::-webkit-datetime-edit-text,
+    input[type="date"]::-webkit-datetime-edit-month-field,
+    input[type="date"]::-webkit-datetime-edit-day-field,
+    input[type="date"]::-webkit-datetime-edit-year-field {
+        color: #6b7280;
     }
 
     input[type="date"]::-webkit-calendar-picker-indicator {
-        filter: invert(60%);
         width: 20px;
         height: 20px;
+        filter: invert(60%);
     }
 </style>
