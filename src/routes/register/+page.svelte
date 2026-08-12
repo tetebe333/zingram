@@ -182,7 +182,7 @@ async function handleRegister(event: Event) {
                             type="date"
                             bind:value={user.dob}
                             name="dob"
-                            class="input-field w-full text-gray-500 font-semibold"
+                            class="input-field  text-gray-500 font-semibold"
                             required
                         />
                     </div>
@@ -276,17 +276,27 @@ async function handleRegister(event: Event) {
 </AuthBackground>
 
 <style>
-    /* input[type="date"] {
-        width: 100%;
-        min-width: 0;
-        max-width: 100%;
-        box-sizing: border-box;
-    }
+   input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    font-size: 16px;
+}
 
-    input[type="date"]::-webkit-date-and-time-value {
-        width: 100%;
-        text-align: left;
-    } */
+input[type="date"]::-webkit-date-and-time-value {
+    width: 100%;
+    text-align: left;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+    width: 20px;
+    height: 20px;
+    filter: invert(60%);
+}
 
     input[type="date"]::-webkit-calendar-picker-indicator {
         filter: invert(60%);
