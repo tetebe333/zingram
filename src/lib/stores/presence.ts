@@ -15,6 +15,7 @@ export interface PresenceState {
 }
 
 const initialState: PresenceState = {
+    
     uid: null,
 
     online: false,

@@ -126,7 +126,10 @@ export function loadUsersPresence(uids: string[]) {
                 presenceMapStore.update((current) => ({
                     ...current,
                     [uid]: {
-                        online: data.online ?? false,
+                        online:
+                        data.online === true &&
+                        data.lastSeen?.toDate &&
+                        (Date.now() - data.lastSeen.toDate().getTime()) < 30000,
                         typing: data.typing ?? false,
                         recording: data.recording ?? false,
                         currentConversationId:
