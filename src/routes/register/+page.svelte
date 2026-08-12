@@ -173,10 +173,9 @@ async function handleRegister(event: Event) {
                     <input type="email" bind:value={user.email} name="email" placeholder="Email" class="input-field w-full" required />
                 </div>
 
-                <!-- <div class="flex gap-2 justify-between"> -->
+                <div class="flex gap-2 justify-between min-w-0">
                     <!-- Date of Birth -->
-                    <!-- Date of Birth -->
-                    <div class="relative w-full">
+                    <div class="relative w-full min-w-0">
                         <CalendarDays class="input-icon" size="18"/>
 
                         <input
@@ -189,7 +188,7 @@ async function handleRegister(event: Event) {
                     </div>
 
                      <!-- Gender -->
-                    <div class="relative w-full">
+                    <div class="relative w-full min-w-0">
                         <NonBinary class="input-icon" size="18"/>
                         <ChevronDown class="absolute right-3 top-3 text-gray-500" size="18"/>
                         <select  name="gender" bind:value={user.gender} class="appearance-none input-field w-full text-gray-500" required>
@@ -199,7 +198,7 @@ async function handleRegister(event: Event) {
                             <option class="text-gray-500" value="female">Female</option>
                         </select>
                     </div>
-                <!-- </div> -->
+                </div>
 
                 <!-- Password -->
                 <div class="relative">
@@ -277,7 +276,7 @@ async function handleRegister(event: Event) {
 </AuthBackground>
 
 <style>
-    input[type="date"] {
+    /* input[type="date"] {
         width: 100%;
         min-width: 0;
         max-width: 100%;
@@ -287,7 +286,7 @@ async function handleRegister(event: Event) {
     input[type="date"]::-webkit-date-and-time-value {
         width: 100%;
         text-align: left;
-    }
+    } */
 
     input[type="date"]::-webkit-calendar-picker-indicator {
         filter: invert(60%);
