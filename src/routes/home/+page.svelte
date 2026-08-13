@@ -168,8 +168,7 @@ function openMyProfile() {
     </div>
     
    
-        {#if $ConversationsStore.length === 0}
-
+       {#if !$ConversationsStore.some((conversation) => conversation.lastMessage)}
             <div class="flex-col justify-center gap-1 py-50 text-center">
 
                 <div class="flex justify-center">

@@ -388,17 +388,17 @@ function openHome() {
 
 
     <!-- Settings & Privacy -->
-    <button
+    <button onclick={()=> goto('/settings')}
         class="w-full mt-4 bg-[#0B1220] rounded-2xl px-4 py-5 border border-[#202D46] flex items-center justify-between"
     >
 
         <div class="flex flex-col items-start">
             <p class="text-white font-semibold">
-                Settings & Privacy
+                Settings & Security
             </p>
 
             <p class="text-xs text-gray-500 mt-1">
-                Manage your account, privacy, and preferences
+                Manage your account, security, and preferences
             </p>
         </div>
 
