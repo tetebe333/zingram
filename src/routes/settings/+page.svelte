@@ -14,7 +14,7 @@ let showDeleteAccModel = $state(false);
 let showChangeEmalModel = $state(false); 
 let showChangePasswordModel = $state(false); 
 let showForgetPasswordModel = $state(false); 
-
+let loading = $state(false); 
 
 
 
@@ -147,7 +147,7 @@ let showForgetPasswordModel = $state(false);
                   showDeleteAccModel = true;
                   showConfirmDeleteAcc = false;
                 }}
-                    class="flex-1 rounded-xl bg-red-600 py-3 font-semibold text-white transition hover:bg-[#E63F5B]"
+                    class="flex-1 rounded-xl bg-red-500 py-3 font-semibold text-white transition hover:bg-[#E63F5B]"
                 >
                     Delete
                 </button>
@@ -189,9 +189,18 @@ let showForgetPasswordModel = $state(false);
                 </div>
 
                 <button
-                class="mt-6 w-full rounded-xl bg-red-600 py-3 font-semibold text-white transition hover:bg-[#E63F5B]"
+                class="mt-6 w-full rounded-xl bg-red-500 py-3 font-semibold text-white transition hover:bg-[#E63F5B] flex justify-center items-center gap-2"
                 >
-                Delete Account
+                    {#if loading}
+                        <!-- SVG Loading Spinner -->
+                        <svg class="animate-spin h-5 w-full max-w-5 text-white" xmlns="http://w3.org" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Deleting...</span>
+                    {:else}
+                        <span>Delete Account</span>
+                    {/if}
                 </button>
 
                 <button  onclick={()=> showDeleteAccModel = false}
@@ -251,9 +260,18 @@ let showForgetPasswordModel = $state(false);
 
                 <!-- Change Email Button -->
                 <button
-                class="mt-6 w-full rounded-xl bg-[#4380FF] py-3 font-semibold text-white transition hover:bg-[#356FE5]"
+                class="mt-6 w-full rounded-xl bg-[#4380FF] py-3 font-semibold text-white transition hover:bg-[#356FE5] flex justify-center items-center gap-2"
                 >
-                Change Email
+                 {#if loading}
+                        <!-- SVG Loading Spinner -->
+                        <svg class="animate-spin h-5 w-full max-w-5 text-white" xmlns="http://w3.org" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Changing...</span>
+                    {:else}
+                        <span>Change Email</span>
+                    {/if}
                 </button>
 
                 <!-- Cancel -->
@@ -341,9 +359,18 @@ let showForgetPasswordModel = $state(false);
 
                     <button
                         type="button"
-                        class="rounded-xl bg-[#4380FF] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#356FE5]"
+                        class="rounded-xl bg-[#4380FF] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#356FE5] flex justify-center items-center gap-2"
                     >
-                        Change Password
+                        {#if loading}
+                            <!-- SVG Loading Spinner -->
+                            <svg class="animate-spin h-5 w-full max-w-5 text-white" xmlns="http://w3.org" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Changing...</span>
+                        {:else}
+                            <span>Change Password</span>
+                        {/if}
                     </button>
 
                     <button onclick={()=> showChangePasswordModel = false}
@@ -386,11 +413,21 @@ let showForgetPasswordModel = $state(false);
 
             <button
                 type="button"
-                class="flex items-center gap-2 rounded-xl bg-[#4380FF] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#356FE5]"
+                class="flex justify-center items-center gap-2 rounded-xl bg-[#4380FF] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#356FE5]"
             >
-                Send Reset Link
 
-                <Send size="16" />
+                {#if loading}
+                    <!-- SVG Loading Spinner -->
+                    <svg class="animate-spin h-5 w-full max-w-5 text-white" xmlns="http://w3.org" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Sending...</span>
+                {:else}
+                    <span>Send Reset Link</span>
+                    <Send size="16" />
+                {/if}
+
             </button>
 
             </div>
