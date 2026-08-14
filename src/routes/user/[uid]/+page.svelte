@@ -210,7 +210,7 @@ async function openChat(uid:string) {
 
                 <div>
                     <a href={user.facebook} target="_blank" class="flex gap-3 items-center hover:underline text-blue-600 underline sm:no-underline">
-                        www.{user.username}.facebook.com
+                        {user.username}.facebook.com
                         <SquareArrowOutUpRight class="text-Lmuted" size="15"/>
                     </a>
                 </div>
@@ -227,7 +227,7 @@ async function openChat(uid:string) {
                 <div>
 
                     <a href={user.instagram} target="_blank" class="hover:underline text-blue-600 flex gap-3 items-center">
-                        www.{user.username}.instagram.com
+                        {user.username}.instagram.com
                         <SquareArrowOutUpRight class="text-Lmuted" size="15"/>
                     </a>
                 </div>
@@ -235,7 +235,7 @@ async function openChat(uid:string) {
             </div>
         {/if}
         
-        {#if user.instagram}
+        {#if user.whatsapp}
             <div class="flex justify-between pb-3 items-center w-full  border-b border-[#202D46]">
                 <div class="flex gap-3 items-center">
                 <img src="/icons8-whatsapp-logo-94.png" alt="" class="h-5 w-5 ">
@@ -248,7 +248,7 @@ async function openChat(uid:string) {
                     rel="noopener noreferrer"
                     class="text-blue-600 hover:underline"
                     >
-                        {user.whatsapp}
+                        {user.username}.whatsApp.com
                     </a>
                 </div>
 

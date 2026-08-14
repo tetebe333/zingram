@@ -13,12 +13,10 @@
     } from 'lucide-svelte';
 
     import { userStore } from '$lib/stores/user';
-    import { loadCurrentUser } from '$lib/services/auth';
+    import { loadCurrentUser, userNameExist, checkAndUpdateEmail } from '$lib/services/auth';
     import { uploadImage } from '$lib/services/cloudinary';
     import { doc, updateDoc } from 'firebase/firestore';
     import { db } from '$lib/firebase/firebase';
-    import { userNameExist} from '$lib/services/auth';
-
 
     let isLoading = $state(false);
     let isSaving = $state(false);
@@ -62,6 +60,7 @@
                 profileImage =
                     $userStore?.profileImage ?? '/male-avatar.PNG';
 
+            await checkAndUpdateEmail()
             await loadCurrentUser();
             if ($userStore) {
                 fullName = $userStore.fullName;
@@ -385,8 +384,9 @@ async function checkUsername() {
                     class="w-full cursor-not-allowed rounded-xl border border-[#202D46] bg-[#111827] px-4 py-3 text-base text-gray-500"
                 />
 
-                <p class="mt-2 text-[11px] text-gray-600">
-                    Email address cannot be changed
+                <p class="mt-1 text-[11px] text-gray-600">
+                    Email address cannot be changed here. <br>
+                    Go to Settings → Account & Security to change email.
                 </p>
             </div>
 

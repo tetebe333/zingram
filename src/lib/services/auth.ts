@@ -2,7 +2,7 @@
 import { auth, db } from '$lib/firebase/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { type RegisterUser } from '$lib/types/user'; // Inline type specifier resolves Vite bundling quirks
-import { collection, onSnapshot, getDocs, getDoc, query, where, updateDoc, doc, serverTimestamp, setDoc, addDoc} from 'firebase/firestore';
+import { collection, onSnapshot, getDocs, getDoc, query, where, updateDoc, doc, serverTimestamp, setDoc, deleteDoc} from 'firebase/firestore';
 import { type UserState } from '$lib/stores/user'; 
 import { userStore } from '$lib/stores/user';
 import { audioStore } from '$lib/stores/audio';
@@ -11,7 +11,7 @@ import { chatUserStore } from '$lib/stores/chatUser';
 import { ConversationStore, type ConversationState } from '$lib/stores/conversation';
 import { setOnline } from './presence';
 import { loadUserPresence } from './presence';
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { onAuthStateChanged, type User, sendPasswordResetEmail, updatePassword, verifyBeforeUpdateEmail, EmailAuthProvider, reauthenticateWithCredential , reload, deleteUser } from "firebase/auth";
 
 export function waitForAuth(): Promise<User | null> {
     return new Promise((resolve) => {
@@ -20,6 +20,62 @@ export function waitForAuth(): Promise<User | null> {
             resolve(user);
         });
     });
+}
+
+
+//change password
+export async function changePassword(newPassword: string) {
+    const currentUser = await waitForAuth();
+
+
+    if (!currentUser) {
+        throw new Error('No authenticated user found.');
+    }
+
+    if (!currentUser.email) {
+        throw new Error('No email associated with this account.');
+    }
+
+    // The current password will already be verified
+    // by the Settings screen before this function is called.
+
+    await updatePassword(currentUser, newPassword);
+}
+
+//verify current user
+export async function verifyCurrentPassword(currentPassword: string) {
+    const user = await waitForAuth();
+
+    if (!user || !user.email) {
+        throw new Error('No authenticated user found.');
+    }
+
+    const credential = EmailAuthProvider.credential(
+        user.email,
+        currentPassword
+    );
+
+    await reauthenticateWithCredential(user, credential);
+}
+
+//password reset
+export async function sendResetPasswordEmail(email: string) {
+    if (!email) {
+        throw new Error('Email is required');
+    }
+
+    await sendPasswordResetEmail(auth, email);
+}
+
+//change email
+export async function changeEmail(newEmail: string) {
+    const user = await waitForAuth();
+
+    if (!user) {
+        throw new Error('No authenticated user found.');
+    }
+
+    await verifyBeforeUpdateEmail(user, newEmail);
 }
 
 // Function to register a new user
@@ -82,6 +138,18 @@ export async function userNameExist(userName: string): Promise<boolean> {
     return !snapshort.empty;
 }
 
+// Check if email already exists
+export async function emailExist(email: string): Promise<boolean> {
+    const emailQuery = query(
+        collection(db, 'users'),
+        where('email', '==', email)
+    );
+
+    const snapshot = await getDocs(emailQuery);
+
+    return !snapshot.empty;
+}
+
 // Login user
 export async function loginUser(email: string, password: string) {
     // Authenticate user
@@ -93,6 +161,7 @@ export async function loginUser(email: string, password: string) {
 
     return await loadCurrentUser()
 }
+
 
 export async function loadCurrentUser() {
     
@@ -122,10 +191,14 @@ export async function loadCurrentUser() {
         ...userInfo
     } = userData;
 
-    // Save only user information
-    userStore.set({
+    // Firebase Auth is the source of truth for the user's email
+    const updatedUserInfo = {
         ...userInfo,
-    } as UserState);
+        email: currentUser.email ?? userInfo.email,
+    } as UserState;
+
+    // Save user information
+    userStore.set(updatedUserInfo);
 
     // Save playback speed
     audioStore.update((state) => ({
@@ -133,7 +206,7 @@ export async function loadCurrentUser() {
         playbackSpeed: playbackSpeed ?? 1
     }));
 
-   // Check if userPresence document exists
+    // Check if userPresence document exists
     const presenceRef = doc(db, "userPresence", currentUser.uid);
     const presenceSnap = await getDoc(presenceRef);
 
@@ -161,8 +234,8 @@ export async function loadCurrentUser() {
     // User is online
     await setOnline();
 
-        return userInfo;
-    }
+    return updatedUserInfo;
+}
 
 export function loadUsers(): Promise<() => void> {
     return new Promise(async (resolve, reject) => {
@@ -332,4 +405,90 @@ export async function findOrCreateConversation(chatUserUid:string) {
 
         return newConversation;
     }
+}
+
+// Check Firebase Auth email and update userStore if it has changed
+export async function checkAndUpdateEmail() {
+    const currentUser = await waitForAuth();
+
+    if (!currentUser || !currentUser.email) {
+        return;
+    }
+
+    // Get the latest information from Firebase
+    await reload(currentUser);
+
+    const firebaseEmail = currentUser.email;
+
+    if (!firebaseEmail) {
+        return;
+    }
+
+    // Only update the store if Firebase has a different email
+    userStore.update((user) => {
+        if (!user || user.email === firebaseEmail) {
+            return user;
+        }
+
+        return {
+            ...user,
+            email: firebaseEmail
+        };
+    });
+}
+
+//delete user
+// Delete the currently authenticated user's entire account and related data
+export async function deleteAccount() {
+    const currentUser = await waitForAuth();
+
+    if (!currentUser) {
+        throw new Error('No authenticated user found.');
+    }
+
+    const uid = currentUser.uid;
+
+    // Find and delete every conversation
+    // where this user is a participant.
+    const conversationsQuery = query(
+        collection(db, 'conversations'),
+        where('participants', 'array-contains', uid)
+    );
+
+    const conversationsSnapshot = await getDocs(conversationsQuery);
+
+    for (const conversationDoc of conversationsSnapshot.docs) {
+        await deleteDoc(conversationDoc.ref);
+    }
+
+    // Find and delete every message
+    // where this user is the sender.
+    const messagesQuery = query(
+        collection(db, 'messages'),
+        where('senderId', '==', uid)
+    );
+
+    const messagesSnapshot = await getDocs(messagesQuery);
+
+    for (const messageDoc of messagesSnapshot.docs) {
+        await deleteDoc(messageDoc.ref);
+    }
+
+    // Delete user presence
+    await deleteDoc(
+        doc(db, 'userPresence', uid)
+    ).catch(() => {
+        // Ignore if the presence document does not exist.
+    });
+
+    // Delete the user's Firestore profile
+    await deleteDoc(
+        doc(db, 'users', uid)
+    );
+
+    // Delete Firebase Authentication account
+    await deleteUser(currentUser);
+
+    // Clear the local user store
+    userStore.set(null);
 }

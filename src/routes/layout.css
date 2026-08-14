@@ -31,10 +31,19 @@
     @apply w-full min-w-0 max-w-full box-border bg-slate-900 ps-11 pe-4 py-2 border border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500;
 }
 
+.fInput{
+    @apply w-full rounded-xl border border-[#303A55] bg-[#151D32] px-4 py-3 text-white outline-none placeholder:text-[#596278] focus:border-[#4380FF];
+}
+
+.finput-fieldInvalid{
+    @apply w-full rounded-xl border border-red-500 bg-[#151D32] px-4 py-3 text-white outline-none placeholder:text-[#596278] focus:border-red-500;
+}
 
 .input-fieldInvalid{
     @apply bg-slate-900  ps-11 pe-4 py-2 border border-red-500 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500;
 }
+
+
 
 .input-icon{
     @apply absolute left-4 top-3 inline mb-1 me-1 text-gray-500;

@@ -1,9 +1,11 @@
 <script lang="ts">
-import { ArrowLeft, ChevronRight, LockKeyhole, Mail, Trash2, TriangleAlert, Send    } from 'lucide-svelte';
+import { ArrowLeft, ChevronRight, LockKeyhole, Mail, Trash2, TriangleAlert, Send , Eye, EyeOff   } from 'lucide-svelte';
 import { goto } from '$app/navigation';
 import { userStore } from '$lib/stores/user';
-import { loadCurrentUser } from '$lib/services/auth';
 import { onMount } from 'svelte';
+import { loadCurrentUser, emailExist, sendResetPasswordEmail, changePassword, changeEmail, verifyCurrentPassword, checkAndUpdateEmail, deleteAccount } from '$lib/services/auth';
+import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { auth } from '$lib/firebase/firebase';
 
  onMount(async () => {
     await loadCurrentUser()
@@ -14,10 +16,373 @@ let showDeleteAccModel = $state(false);
 let showChangeEmalModel = $state(false); 
 let showChangePasswordModel = $state(false); 
 let showForgetPasswordModel = $state(false); 
-let loading = $state(false); 
+let showPassword = $state(false);
+let loading = $state(false);
+
+let ForgotPassWordloading = $state(false);
+
+//notification lets
+let showNotification = $state(false);
+let notificationTitle = $state('');
+let notificationMessage = $state('');
+let notificationType = $state<'success' | 'error'>('error');
+
+//chane password lets
+let currentPassword = $state('');
+let newPassword = $state('');
+let confirmNewPassword = $state('');
+let confirmpasswordIsValid = $state(true);
+let passwordIncorrect = $state(false)
+
+//change email lets
+let currentEmailPassword = $state('');
+let newEmail = $state('');
+
+let deletePassword = $state('')
 
 
+function showNotificationMessage(
+    message: string,
+    type: 'success' | 'error' = 'error',
+    title?: string
+) {
+    notificationMessage = message;
+    notificationType = type;
 
+    notificationTitle =
+        title ?? (type === 'success' ? 'Success' : 'Something went wrong');
+
+    showNotification = true;
+}
+
+function closeNotification() {
+    showNotification = false;
+    notificationTitle = '';
+    notificationMessage = '';
+}
+
+async function handleForgotPassword() {
+    const email = $userStore?.email;
+
+    if (!email) {
+        showNotificationMessage(
+            'No email address found.',
+            'error',
+            'Email Not Found'
+        );
+        return;
+    }
+
+    ForgotPassWordloading = true;
+
+    try {
+        await sendResetPasswordEmail(email);
+
+        showNotificationMessage(
+            'We sent a password reset link to your email. If you don’t see it shortly, please check your Spam/Junk email folder.',
+            'success',
+            'Password Reset Link Sent'
+        );
+
+        showForgetPasswordModel = false;
+
+    } catch (error) {
+        console.error('Failed to send reset password email:', error);
+
+        showNotificationMessage(
+            'Unable to send the reset link. Please try again.',
+            'error',
+            'Reset Link Failed'
+        );
+
+    } finally {
+        ForgotPassWordloading = false;
+    }
+}
+async function handleChangePassword() {
+     passwordIncorrect = false
+
+    if (!currentPassword) {
+        showNotificationMessage(
+            'Please enter your current password.',
+            'error',
+            'Missing Password'
+        
+        );
+        return;
+    }
+
+    if (!newPassword) {
+        showNotificationMessage(
+            'Please enter your new password.',
+             'error',
+            'Missing Password'
+        );
+        return;
+    }
+
+    if (!confirmNewPassword) {
+        showNotificationMessage(
+            'Please confirm your new password.',
+            'error',
+            'confirm password'
+        );
+        return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+         confirmpasswordIsValid = false;
+        return;
+    }
+
+    loading = true;
+
+    try {
+        const user = $userStore;
+
+        if (!user?.email) {
+            showNotificationMessage(
+                'Unable to find your account email.',
+                'error',
+                'Account not found'
+            );
+            return;
+        }
+
+        // We verify the CURRENT password with Firebase.
+        const credential = EmailAuthProvider.credential(
+            user.email,
+            currentPassword
+        );
+
+        const firebaseUser = auth.currentUser;
+
+        if (!firebaseUser) {
+            showNotificationMessage(
+                'No authenticated user found.',
+                'error',
+                'User not found'
+            );
+            return;
+        }
+
+        await reauthenticateWithCredential(
+            firebaseUser,
+            credential
+        );
+
+        // Current password is correct.
+        // Now change to the new password.
+        await changePassword(newPassword);
+
+        showNotificationMessage(
+            'Password changed successfully.',
+            'success',
+            'password changed'
+        );
+
+        showChangePasswordModel = false;
+        currentPassword = '';
+        newPassword = '';
+        confirmNewPassword = '';
+        confirmpasswordIsValid = true;
+        passwordIncorrect = false;
+        showPassword = false;
+        passwordIncorrect = false
+    } catch (error: any) {
+        console.error('Change password error:', error);
+
+        if (
+            error?.code === 'auth/wrong-password' ||
+            error?.code === 'auth/invalid-credential'
+        ) {
+            passwordIncorrect = true
+            return;
+        }
+
+        showNotificationMessage(
+            'Unable to change password. Please try again.',
+            'error',
+            'password Change Failed'
+        );
+
+    } finally {
+        loading = false;
+    }
+}
+
+
+//handle change email password
+async function handleChangeEmail() {
+    passwordIncorrect = false;
+
+    const user = $userStore;
+
+    if (!user?.email) {
+        showNotificationMessage(
+            'Unable to find your current email address.',
+            'error',
+            'Account not found'
+        );
+        return;
+    }
+
+    if (!currentEmailPassword) {
+        showNotificationMessage(
+            'Please enter your current password.',
+            'error',
+            'Missing Password'
+        );
+        return;
+    }
+
+    if (!newEmail) {
+        showNotificationMessage(
+            'Please enter your new email address.',
+            'error',
+            'Missing Email'
+        );
+        return;
+    }
+
+    if (newEmail === user.email) {
+        showNotificationMessage(
+            'Please enter a different email address.',
+            'error',
+            'Same Email'
+        );
+        return;
+    }
+
+    loading = true;
+
+    try {
+        // Check if the new email already belongs to another account
+        const emailAlreadyUsed = await emailExist(newEmail);
+
+        if (emailAlreadyUsed) {
+            showNotificationMessage(
+                'This email address is already being used by another account.',
+                'error',
+                'Email Already In Use'
+            );
+            return;
+        }
+
+        // Verify the user's current password
+        await verifyCurrentPassword(currentEmailPassword);
+
+        // Send Firebase verification link
+        await changeEmail(newEmail);
+
+        showNotificationMessage(
+            'We sent a verification link to your new email address. Click the link to complete the change.',
+            'success',
+            'Verification Link Sent'
+        );
+
+        passwordIncorrect = false
+        showChangeEmalModel = false;
+        currentEmailPassword = '';
+        newEmail = '';
+        passwordIncorrect = false;
+
+    } catch (error: any) {
+        console.error('Change email error:', error);
+
+        // Wrong current password
+        if (
+            error?.code === 'auth/wrong-password' ||
+            error?.code === 'auth/invalid-credential'
+        ) {
+            passwordIncorrect = true;
+            return;
+        }
+
+        // Invalid email format
+        if (error?.code === 'auth/invalid-email') {
+            showNotificationMessage(
+                'Please enter a valid email address.',
+                'error',
+                'Invalid Email'
+            );
+            return;
+        }
+
+        showNotificationMessage(
+            'Unable to send the verification link. Please try again.',
+            'error',
+            'Email Change Failed'
+        );
+
+    } finally {
+        loading = false;
+    }
+}
+
+
+function validateConfirmPassword() {
+    if (confirmNewPassword && newPassword !== confirmNewPassword) {
+        confirmpasswordIsValid = false;
+    } else {
+        confirmpasswordIsValid = true;
+    }
+}
+
+// handle delete user
+async function handleDeleteAccount() {
+    passwordIncorrect = false;
+    loading = true;
+
+    if (!deletePassword) {
+        showNotificationMessage(
+            'Please enter your current password.',
+            'error',
+            'Missing Password'
+        );
+        loading = false;
+        return;
+    }
+
+    try {
+        const currentUser = auth.currentUser;
+
+        if (!currentUser || !currentUser.email) {
+            return;
+        }
+
+        const credential = EmailAuthProvider.credential(
+            currentUser.email,
+            deletePassword
+        );
+
+        await reauthenticateWithCredential(currentUser, credential);
+
+        
+        await deleteAccount();
+
+        deletePassword = '';
+        passwordIncorrect = false;
+        showDeleteAccModel = false;
+        showPassword = false;
+        // No success notification.
+        goto('/login');
+
+    } catch (error: any) {
+        if (
+            error.code === 'auth/wrong-password' ||
+            error.code === 'auth/invalid-credential'
+        ) {
+            passwordIncorrect = true;
+            return;
+        }
+
+        console.error('Delete account error:', error);
+
+    } finally {
+        loading = false;
+    }
+}
 </script>
 <div class="relative py-12 px-4">
     <!-- header -->
@@ -32,7 +397,7 @@ let loading = $state(false);
     </p>
 
     <!-- change password btn -->
-    <button onclick={()=> showChangePasswordModel = true}
+    <button onclick={()=> showChangePasswordModel = true }
     class="w-full text-gray-500 relative mt-4 rounded-2xl bg-[#0B1220] p-5 border-2 border-[#1A2742]">
         <div class="flex items-center justify-between">
             <!-- left div -->
@@ -53,7 +418,7 @@ let loading = $state(false);
     </button>
 
     <!-- change email btn -->
-    <button  onclick={()=> showChangeEmalModel = true}
+    <button  onclick={()=> showChangeEmalModel = true }
     class="text-gray-500 relative mt-4 rounded-2xl w-full bg-[#0B1220] p-5 border-2 border-[#1A2742]">
         <div class="flex items-center justify-between">
             <!-- left div -->
@@ -86,7 +451,7 @@ let loading = $state(false);
     <!-- delete acc box -->
     <div class="text-gray-500 relative mt-5 rounded-2xl bg-[#160F1D] p-5 border-2 border-red-300/10">
         <!-- delete acc btn -->
-        <button onclick={()=> showConfirmDeleteAcc = true}
+        <button onclick={()=> showConfirmDeleteAcc = true }
         class="flex items-center justify-between w-full">
             <!-- left div -->
              <div class="flex gap-4">
@@ -172,23 +537,34 @@ let loading = $state(false);
                 </p>
 
                 <div class="mt-6">
-                <label for="password" class="mb-2 block text-sm font-semibold text-[#A4ABBC]">
-                    Password
-                </label>
+                    <label for="password" class="mb-2 block text-sm font-semibold text-[#A4ABBC]">
+                        Password
+                    </label>
 
-                <input
-                    type="password"
-                    placeholder="Enter your password"
-                    class="w-full rounded-xl border border-[#303A55] bg-[#151D32] px-4 py-3 text-white outline-none placeholder:text-[#596278] focus:border-[#4380FF]"
-                />
+                    <div class="relative">
+                        <input
+                        bind:value={deletePassword}
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="Enter your password"
+                            class="w-full rounded-xl border border-[#303A55] bg-[#151D32] px-4 py-3 text-white outline-none placeholder:text-[#596278] focus:border-[#4380FF]"
+                        />
+                        <button type="button" class="absolute right-3 top-3 text-gray-500" onclick={() => showPassword = !showPassword}>
+                                    {#if showPassword}
+                                <Eye size="18"/>
+                            {:else}
+                                <EyeOff size="18"/>
+                            {/if}
+                        </button>
+                    </div>   
 
-                <!-- Show this only when password is incorrect -->
-                <p class="mt-2 text-sm font-medium text-red-600">
-                    Your password is incorrect !
-                </p>
+                    {#if passwordIncorrect}
+                        <p class="mt-2 text-sm font-medium text-red-600">
+                            Your password is incorrect !
+                        </p>
+                    {/if}
                 </div>
 
-                <button
+                <button onclick={handleDeleteAccount}
                 class="mt-6 w-full rounded-xl bg-red-500 py-3 font-semibold text-white transition hover:bg-[#E63F5B] flex justify-center items-center gap-2"
                 >
                     {#if loading}
@@ -203,7 +579,12 @@ let loading = $state(false);
                     {/if}
                 </button>
 
-                <button  onclick={()=> showDeleteAccModel = false}
+                <button  onclick={()=>{
+                    deletePassword = '';
+                    passwordIncorrect = false;
+                    showDeleteAccModel = false;
+                    showPassword = false;
+                }}
                 class="mt-3 w-full py-2 text-sm font-semibold text-[#71809D] transition hover:text-white"
                 >
                 Cancel
@@ -223,59 +604,81 @@ let loading = $state(false);
                 Change Email
                 </h2>
 
-                <p class="mt-2 text-sm text-[#8A93A8]">
-                Enter your current password and your new email address.
+                <p class="mt-3 text-sm leading-6 text-[#8A93A8]">
+                  Enter your current password and your new email address. And We’ll send a verification link to your new email address. Click the link to confirm and complete the email change.
                 </p>
 
                 <!-- Current Password -->
                 <div class="mt-6">
-                <label for="password" class="mb-2 block text-sm font-semibold text-[#A4ABBC]">
-                    Current Password
-                </label>
+                    <label for="password" class="mb-2 block text-sm font-semibold text-[#A4ABBC]">
+                        Current Password
+                    </label>
 
-                <input
-                    type="password"
-                    placeholder="Enter your current password"
-                    class="w-full rounded-xl border border-[#303A55] bg-[#151D32] px-4 py-3 text-white outline-none placeholder:text-[#596278] focus:border-[#4380FF]"
-                />
+                    <div class="relative">
+                        <input
+                        bind:value={currentEmailPassword}
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="Enter your current password"
+                            class="w-full rounded-xl border border-[#303A55] bg-[#151D32] px-4 py-3 text-white outline-none placeholder:text-[#596278] focus:border-[#4380FF]"
+                        />
+                        <button type="button" class="absolute right-3 top-3 text-gray-500" onclick={() => showPassword = !showPassword}>
+                                        {#if showPassword}
+                                    <Eye size="18"/>
+                                {:else}
+                                    <EyeOff size="18"/>
+                                {/if}
+                        </button>
+                    </div>   
 
-                <!-- Show only when password is incorrect -->
-                <p class="mt-2 text-sm font-medium text-red-600">
-                    Your password is incorrect.
-                </p>
+                      <!-- Error -->
+                    {#if passwordIncorrect}
+                        <p class="mt-2 text-sm font-medium text-red-600">
+                            Your password is incorrect !
+                        </p>
+                    {/if}
+              
                 </div>
 
                 <!-- New Email -->
                 <div class="mt-5">
-                <label for="email" class="mb-2 block text-sm font-semibold text-[#A4ABBC]">
-                    New Email
-                </label>
+                    <label for="email" class="mb-2 block text-sm font-semibold text-[#A4ABBC]">
+                        New Email
+                    </label>
 
-                <input
-                    type="email"
-                    placeholder="Enter your new email"
-                    class="w-full rounded-xl border border-[#303A55] bg-[#151D32] px-4 py-3 text-white outline-none placeholder:text-[#596278] focus:border-[#4380FF]"
-                />
+                    <input
+                        bind:value={newEmail}
+                        type="email"
+                        placeholder="Enter your new email"
+                        class="w-full rounded-xl border border-[#303A55] bg-[#151D32] px-4 py-3 text-white outline-none placeholder:text-[#596278] focus:border-[#4380FF]"
+                    />
                 </div>
 
                 <!-- Change Email Button -->
-                <button
+                <button onclick={handleChangeEmail}
                 class="mt-6 w-full rounded-xl bg-[#4380FF] py-3 font-semibold text-white transition hover:bg-[#356FE5] flex justify-center items-center gap-2"
                 >
-                 {#if loading}
-                        <!-- SVG Loading Spinner -->
-                        <svg class="animate-spin h-5 w-full max-w-5 text-white" xmlns="http://w3.org" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span>Changing...</span>
+                  {#if loading}
+                    <!-- SVG Loading Spinner -->
+                    <svg class="animate-spin h-5 w-full max-w-5 text-white" xmlns="http://w3.org" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Sending...</span>
                     {:else}
-                        <span>Change Email</span>
+                        <span>Send Verification Link</span>
+                        <Send size="16" />
                     {/if}
                 </button>
 
                 <!-- Cancel -->
-                <button onclick={()=> showChangeEmalModel = false}
+                <button onclick={()=>{
+                    passwordIncorrect = false;
+                    showChangeEmalModel = false;
+                    currentEmailPassword = '';
+                    newEmail = '';
+                    loading = false;
+                    showPassword = false;
+                }}
                 class="mt-3 w-full py-2 text-sm font-semibold text-[#71809D] transition hover:text-white"
                 >
                 Cancel
@@ -302,34 +705,56 @@ let loading = $state(false);
 
                 <!-- Current Password -->
                 <div class="mt-6">
-                <label for="password" class="mb-2 block text-sm font-semibold text-[#A4ABBC]">
-                    Current Password
-                </label>
+                    <label for="password" class="mb-2 block text-sm font-semibold text-[#A4ABBC]">
+                        Current Password
+                    </label>
+                    <div class="relative">
+                        <input
+                            bind:value={currentPassword}
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="Enter your current password"
+                            class="fInput"
+                        />
+                        <button type="button" class="absolute right-3 top-3 text-gray-500" onclick={() => showPassword = !showPassword}>
+                                    {#if showPassword}
+                                    <Eye size="18"/>
+                                {:else}
+                                    <EyeOff size="18"/>
+                                {/if}
+                        </button>
+                    </div>    
 
-                <input
-                    type="password"
-                    placeholder="Enter your current password"
-                    class="w-full rounded-xl border border-[#303A55] bg-[#151D32] px-4 py-3 text-white outline-none placeholder:text-[#596278] focus:border-[#4380FF]"
-                />
-
-                <!-- Error -->
-                <p class="mt-2 text-sm font-medium text-red-600">
-                    Your password is incorrect.
-                </p>
+                    <!-- Error -->
+                    {#if passwordIncorrect}
+                        <p class="mt-2 text-sm font-medium text-red-600">
+                            Your password is incorrect !
+                        </p>
+                    {/if}
                 </div>
 
                 <!-- New Password -->
                 <div class="mt-5">
-                <label for="password" class="mb-2 block text-sm font-semibold text-[#A4ABBC]">
-                    New Password
-                </label>
+                    <label for="password" class="mb-2 block text-sm font-semibold text-[#A4ABBC]">
+                        New Password
+                    </label>
 
-                <input
-                    type="password"
-                    placeholder="Enter your new password"
-                    class="w-full rounded-xl border border-[#303A55] bg-[#151D32] px-4 py-3 text-white outline-none placeholder:text-[#596278] focus:border-[#4380FF]"
-                />
+                    <div class="relative">
+                        <input
+                            bind:value={newPassword}
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="Enter your new password"
+                            class="fInput"
+                        />
+                        <button type="button" class="absolute right-3 top-3 text-gray-500" onclick={() => showPassword = !showPassword}>
+                            {#if showPassword}
+                                <Eye size="18"/>
+                            {:else}
+                                <EyeOff size="18"/>
+                            {/if}
+                        </button>
+                    </div>    
                 </div>
+               
 
                 <!-- Confirm New Password -->
                 <div class="mt-5">
@@ -337,11 +762,28 @@ let loading = $state(false);
                     Confirm New Password
                 </label>
 
-                <input
-                    type="password"
-                    placeholder="Confirm your new password"
-                    class="w-full rounded-xl border border-[#303A55] bg-[#151D32] px-4 py-3 text-white outline-none placeholder:text-[#596278] focus:border-[#4380FF]"
-                />
+                <div class="relative">
+                    <input
+                        type={showPassword ? 'text' : 'password'}
+                        bind:value={confirmNewPassword}
+                        oninput={validateConfirmPassword}
+                        placeholder="Confirm your new password"
+                        class="{confirmNewPassword && !confirmpasswordIsValid ? 'finput-fieldInvalid' : 'fInput'} w-full"
+                    />
+                    <button type="button" class="absolute right-3 top-3 text-gray-500" onclick={() => showPassword = !showPassword}>
+                        {#if showPassword}
+                            <Eye size="18"/>
+                        {:else}
+                            <EyeOff size="18"/>
+                        {/if}
+                    </button>    
+                </div>
+                 <!-- Password Mismatch Error -->
+                <p class="text-red-500 text-sm text-start">
+                    {#if !confirmpasswordIsValid}
+                    Passwords do not match
+                    {/if}
+                </p>
 
                 <!-- Forgot Password -->
                 <div class="mt-2 flex justify-end">
@@ -358,7 +800,7 @@ let loading = $state(false);
                 <div class="mt-7 flex items-center justify-start gap-3">
 
                     <button
-                        type="button"
+                        type="button" onclick={handleChangePassword}
                         class="rounded-xl bg-[#4380FF] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#356FE5] flex justify-center items-center gap-2"
                     >
                         {#if loading}
@@ -373,7 +815,15 @@ let loading = $state(false);
                         {/if}
                     </button>
 
-                    <button onclick={()=> showChangePasswordModel = false}
+                    <button onclick={()=>{
+                        showPassword = false;
+                        showChangePasswordModel = false;
+                        currentPassword = '';
+                        newPassword = '';
+                        confirmNewPassword = '';
+                        confirmpasswordIsValid = true;
+                        passwordIncorrect = false
+                    }}
                         type="button"
                         class="rounded-xl px-5 py-3 text-sm font-semibold text-[#8A93A8] transition hover:text-white"
                     >
@@ -400,7 +850,7 @@ let loading = $state(false);
             <p class="mt-3 text-sm leading-6 text-[#8A93A8]">
             We’ll send you a link to your email to reset your password.
             </p>
-
+             
             <!-- Actions -->
             <div class="mt-7 flex items-center justify-end gap-3">
 
@@ -411,12 +861,12 @@ let loading = $state(false);
                 Cancel
             </button>
 
-            <button
+            <button onclick={handleForgotPassword}
                 type="button"
                 class="flex justify-center items-center gap-2 rounded-xl bg-[#4380FF] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#356FE5]"
             >
 
-                {#if loading}
+                {#if ForgotPassWordloading}
                     <!-- SVG Loading Spinner -->
                     <svg class="animate-spin h-5 w-full max-w-5 text-white" xmlns="http://w3.org" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -436,5 +886,91 @@ let loading = $state(false);
     </div>
      {/if}
 
+    {#if showNotification}
+    <div
+        class="fixed inset-0 z-100 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+    >
+        <div
+            class="w-full max-w-sm rounded-2xl  bg-[#0B1220] border border-[#1A2742] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)]"
+        >
+            <!-- Icon -->
+            <div
+                class={`flex h-12 w-12 items-center justify-center rounded-full ${
+                    notificationType === 'success'
+                        ? 'bg-green-200'
+                        : 'bg-red-100'
+                }`}
+            >
+                {#if notificationType === 'success'}
+                    <svg
+                        class="h-6 w-6 text-green-600"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M5 13l4 4L19 7"
+                        />
+                    </svg>
+                {:else}
+                    <svg
+                        class="h-6 w-6 text-red-600"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M12 9v4m0 4h.01M10.3 3.6l-7.1 12.3A2 2 0 005 19h14a2 2 0 001.8-3.1L13.7 3.6a2 2 0 00-3.4 0z"
+                        />
+                    </svg>
+                {/if}
+            </div>
+
+            <!-- Text -->
+            <div class="mt-4">
+                <h2 class="text-lg font-bold text-gray-200">
+                    {notificationTitle}
+                </h2>
+
+                <p class="mt-2 text-sm leading-6 text-gray-200">
+                    {notificationMessage}
+                </p>
+            </div>
+
+            <!-- OK -->
+            <button
+                type="button"
+                onclick={closeNotification}
+                class={`mt-6 w-full rounded-xl py-3 text-sm font-semibold text-white transition ${
+                    notificationType === 'success'
+                        ? 'bg-green-600 hover:bg-green-700'
+                        : 'bg-red-600 hover:bg-red-700'
+                }`}
+            >
+                OK
+            </button>
+        </div>
+    </div>
+{/if} 
 </div>
 
+
+<style>
+    @keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+</style>
