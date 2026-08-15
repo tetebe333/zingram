@@ -91,5 +91,11 @@ let { children } = $props();
 
     <!-- iPhone / iOS -->
     <link rel="apple-touch-icon" sizes="180x180" href="/zingram-180x180.png.PNG" />
+
+    <!-- iPhone / iOS sm -->
+    <link rel="apple-touch-icon-sm" sizes="16x16" href="/zingram-16x16.png.png" />
+
+    <!-- iPhone / iOS xs-->
+    <link rel="apple-touch-icon-xs" sizes="8x8" href="/zingram-8x8.png.png" />
 </svelte:head>
 {@render children()}

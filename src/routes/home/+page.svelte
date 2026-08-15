@@ -224,7 +224,7 @@ function openMyProfile() {
                         ontouchcancel={cancelLongPress}
                     class="flex w-full items-center justify-between gap-3 text-white border-b border-gray-800 py-4">
                         <!-- Left side -->
-                        <div class="flex flex-1 min-w-0 relative justify-start items-start gap-3">
+                        <div class="flex flex-1 min-w-0 relative justify-start items-start gap-">
                             <img
                                 class="w-12 h-12 rounded-full object-cover shrink-0"
                                 src={conversationUser?.profileImage ?? '/male-avatar.PNG'}
