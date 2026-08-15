@@ -224,34 +224,37 @@ function openMyProfile() {
                         ontouchcancel={cancelLongPress}
                     class="flex w-full items-center justify-between gap-3 text-white border-b border-gray-800 py-4">
                         <!-- Left side -->
-                        <div class="flex relative justify-start items-start gap-3">
+                        <div class="flex flex-1 min-w-0 relative justify-start items-start gap-3">
                             <img
                                 class="w-12 h-12 rounded-full object-cover shrink-0"
                                 src={conversationUser?.profileImage ?? '/male-avatar.PNG'}
                                 alt={conversationUser?.fullName ?? 'User'}
                             >
+
                             {#if $presenceMapStore[conversationUser!.uid]?.online}
                                 <div class="h-3 w-3 bg-green-500 rounded-full absolute top-8 left-9"></div>
                             {/if}
-                            <div class="flex flex-col justify-start items-start">
-                                <!-- Full name -->
-                                <p class="font-semibold truncate capitalize">
+
+                            <div class="flex flex-col justify-start items-start min-w-0 text-start">
+
+                                <p class="font-semibold truncate capitalize w-full">
                                     {conversationUser?.fullName ?? 'Unknown user'}
                                 </p>
+
                                 {#if $presenceMapStore[conversationUser!.uid]?.online}
-                                    <!-- Online / Last seen -->
-                                    <p class="inline-flex items-center rounded-full  text-green-400 text-[11px] font-medium">
+                                    <p class="inline-flex items-center rounded-full text-green-400 text-[11px] font-medium">
                                         Online
                                     </p>
                                 {:else}
-                                <p class="text-xs font-semibold text-gray-500">
-                                    Last seen {formatLastSeen($presenceMapStore[conversationUser!.uid]?.lastSeen)}
-                                </p>
+                                    <p class="text-xs font-semibold text-gray-500">
+                                        Last seen {formatLastSeen($presenceMapStore[conversationUser!.uid]?.lastSeen)}
+                                    </p>
                                 {/if}
-                                <!-- Last message -->
-                                <p class="text-xs text-gray-500 truncate">
+
+                                <p class="text-xs text-gray-500 truncate w-full">
                                     {conversation.lastMessage ?? 'No message'}
                                 </p>
+
                             </div>
                         </div>
                         <!-- Right side -->
