@@ -82,7 +82,7 @@ let { children } = $props();
 </script>
 
 <svelte:head>
-    <link rel="icon" href="/zingram-logo.png" />
-    <link rel="apple-touch-icon" href="/zingram-logo.png" />
+    <link rel="icon" href="/zingram.png" />
+    <link rel="apple-touch-icon" href="/zingram.png" />
 </svelte:head>
 {@render children()}
