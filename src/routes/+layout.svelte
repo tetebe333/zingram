@@ -1,6 +1,5 @@
 <script lang="ts">
 	import './layout.css';
-	import favicon from '$lib/assets/zingram-logo.png';
 	import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { auth } from '$lib/firebase/firebase';
@@ -82,5 +81,8 @@ onMount(() => {
 let { children } = $props();
 </script>
 
-<svelte:head><link rel="icon" href={favicon} /></svelte:head>
+<svelte:head>
+    <link rel="icon" href="/zingram-logo.png" />
+    <link rel="apple-touch-icon" href="/zingram-logo.png" />
+</svelte:head>
 {@render children()}
