@@ -12,11 +12,22 @@
         Link
     } from 'lucide-svelte';
 
+    import { auth } from '$lib/firebase/firebase';
     import { userStore } from '$lib/stores/user';
-    import { loadCurrentUser, userNameExist, checkAndUpdateEmail } from '$lib/services/auth';
+    import { loadCurrentUser, userNameExist, checkAndUpdateEmail, usergoto } from '$lib/services/auth';
     import { uploadImage } from '$lib/services/cloudinary';
     import { doc, updateDoc } from 'firebase/firestore';
     import { db } from '$lib/firebase/firebase';
+      import { onAuthStateChanged, type User } from "firebase/auth";
+
+    export function waitForAuth(): Promise<User | null> {
+        return new Promise((resolve) => {
+            const unsubscribe = onAuthStateChanged(auth, (user) => {
+                unsubscribe();
+                resolve(user);
+            });
+        });
+    }
 
     let isLoading = $state(false);
     let isSaving = $state(false);
@@ -42,6 +53,9 @@
     let usernameMessage = $state('');
     let usernameAvailable = $state(false);
     onMount(async () => {
+
+    await usergoto();
+
         try {
 
                 fullName = $userStore?.fullName ?? '';

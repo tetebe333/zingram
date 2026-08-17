@@ -6,7 +6,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '$lib/firebase/firebase';
 import { setOffline } from "$lib/services/presence";
 import { onMount } from "svelte";
-import { loadCurrentUser, checkAndUpdateEmail } from "$lib/services/auth";
+import { loadCurrentUser, checkAndUpdateEmail, usergoto } from "$lib/services/auth";
 async function logout() {
     try {
 
@@ -19,6 +19,7 @@ async function logout() {
 }
 
 onMount(async () => {
+    await usergoto();
     await checkAndUpdateEmail()
     await loadCurrentUser();
 })

@@ -4,7 +4,7 @@ import { page } from '$app/state';
 import { goto } from '$app/navigation';
 import { ArrowLeft, Ban, Clock, MessageCircle, SquareArrowOutUpRight, VenusAndMars, Calendar, Globe} from 'lucide-svelte';
 import { onMount, onDestroy } from 'svelte';
-import { loadCurrentUser } from '$lib/services/auth';
+import { loadCurrentUser, usergoto } from '$lib/services/auth';
 import { usersStore } from '$lib/stores/users';
 import { loadUsers } from '$lib/services/auth';
 import { findOrCreateConversation } from '$lib/services/auth';
@@ -27,6 +27,7 @@ let lastMessage = $derived(
 );
 
 onMount(async () => {
+    await usergoto();
 
     try {
         await loadUsers();

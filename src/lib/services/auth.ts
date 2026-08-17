@@ -12,6 +12,7 @@ import { ConversationStore, type ConversationState } from '$lib/stores/conversat
 import { setOnline } from './presence';
 import { loadUserPresence } from './presence';
 import { onAuthStateChanged, type User, sendPasswordResetEmail, updatePassword, verifyBeforeUpdateEmail, EmailAuthProvider, reauthenticateWithCredential , reload, deleteUser } from "firebase/auth";
+import { goto } from '$app/navigation';
 
 export function waitForAuth(): Promise<User | null> {
     return new Promise((resolve) => {
@@ -492,3 +493,15 @@ export async function deleteAccount() {
     // Clear the local user store
     userStore.set(null);
 }
+
+export async function usergoto() {
+        const currentUser = await waitForAuth();
+
+        try {
+            if (!currentUser) {
+                goto('/login');
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    }

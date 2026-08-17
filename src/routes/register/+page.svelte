@@ -34,12 +34,35 @@ let usernameMessage = $state('');
 let usernameAvailable = $state(false);
 
 // Keeps track of the active timer
-let errorTimeout: ReturnType<typeof setTimeout>; 
-let registerError = $state('');
 let isLoading = $state(false);
 let confirmPassword = $state('');
 let showPassword = $state(false);
 let confirmpasswordIsValid = $state(true);
+
+let showNotification = $state(false);
+let notificationTitle = $state('');
+let notificationMessage = $state('');
+let notificationType = $state<'success' | 'error'>('success');
+
+function showNotificationMessage(
+    message: string,
+    type: 'success' | 'error' = 'error',
+    title?: string
+) {
+    notificationMessage = message;
+    notificationType = type;
+
+    notificationTitle =
+        title ?? (type === 'success' ? 'Success' : 'Something went wrong');
+
+    showNotification = true;
+}
+
+function closeNotification() {
+    showNotification = false;
+    notificationTitle = '';
+    notificationMessage = '';
+}
 // Function to open the date picker
 
 function validateConfirmPassword() {
@@ -86,7 +109,11 @@ async function handleRegister(event: Event) {
         const exists = await userNameExist(user.username)
         if (exists) {
            usernameMessage = '❌ Username already existd';
-           window.alert('❌ Username already existd');
+            showNotificationMessage(
+                'User name already exist, try using a different one',
+                'error',
+                'Username Exists'
+            );
            return;  
         }
 
@@ -100,23 +127,33 @@ async function handleRegister(event: Event) {
         // Redirect to login page after successful registration
         goto('/upload-avatar');
         user.avatar = '';
-    } catch (error) {
+    } catch (error: any) {
         console.error('Registration failed:', error);
-        // Check if the error is a real Error object with a message property
-        if (error instanceof Error) {
-            registerError = error.message;
-        } else {
-           
-            registerError = 'Registration failed. Please try again.';
+       
+        if (error?.code === 'auth/email-already-in-use') {
+            showNotificationMessage(
+                'This email address is already being used by another account.',
+                'error',
+                'Email Already In Use'
+            );
+            return;
         }
 
-        // 1. Cancel any previous 3-second timer that is still running
-        clearTimeout(errorTimeout);
-
-        // 2. Start a fresh 3-second timer
-        errorTimeout = setTimeout(() => {
-            registerError = '';
-        }, 3000);
+        if (error?.code === 'auth/weak-password') {
+            showNotificationMessage(
+                'Password should be at least 6 characters.',
+                'error',
+                'Weak Password'
+            );
+            return;
+        }
+         
+        showNotificationMessage(
+            'Registration failed. Please try again..',
+            'error',
+            'Registration failed'
+        );
+         
         }finally {
             // Stop loading state
             isLoading = false;
@@ -253,11 +290,6 @@ async function handleRegister(event: Event) {
                     {/if}
                 </button>
             </form>
-            {#if registerError}
-                <div transition:fade class="mt-4 p-2 bg-red-500 text-white text-center">
-                    {registerError}
-                </div>
-            {/if}
         </div>
 
         <div class="mt-4 flex items-center gap-2 ">
@@ -271,6 +303,79 @@ async function handleRegister(event: Event) {
             Login
             <ChevronRight class="inline-block" size="16"/>
         </a>
+
+        {#if showNotification}
+            <div
+                class="fixed inset-0 z-100 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+            >
+                <div
+                    class="w-full max-w-sm rounded-2xl  bg-[#0B1220] border border-[#1A2742] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)]"
+                >
+                    <!-- Icon -->
+                    <div
+                        class={`flex h-12 w-12 items-center justify-center rounded-full ${
+                            notificationType === 'success'
+                                ? 'bg-green-200'
+                                : 'bg-red-100'
+                        }`}
+                    >
+                        {#if notificationType === 'success'}
+                            <svg
+                                class="h-6 w-6 text-green-600"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2.5"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M5 13l4 4L19 7"
+                                />
+                            </svg>
+                        {:else}
+                            <svg
+                                class="h-6 w-6 text-red-600"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2.5"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M12 9v4m0 4h.01M10.3 3.6l-7.1 12.3A2 2 0 005 19h14a2 2 0 001.8-3.1L13.7 3.6a2 2 0 00-3.4 0z"
+                                />
+                            </svg>
+                        {/if}
+                    </div>
+
+                    <!-- Text -->
+                    <div class="mt-4">
+                        <h2 class="text-lg font-bold text-gray-200">
+                            {notificationTitle}
+                        </h2>
+
+                        <p class="mt-2 text-sm leading-6 text-gray-200">
+                            {notificationMessage}
+                        </p>
+                    </div>
+
+                    <!-- OK -->
+                    <button
+                        type="button"
+                        onclick={closeNotification}
+                        class={`mt-6 w-full rounded-xl py-3 text-sm font-semibold text-white transition ${
+                            notificationType === 'success'
+                                ? 'bg-green-600 hover:bg-green-700'
+                                : 'bg-red-600 hover:bg-red-700'
+                        }`}
+                    >
+                        OK
+                    </button>
+                </div>
+            </div>
+        {/if} 
     </div>
     
 </AuthBackground>

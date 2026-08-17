@@ -8,7 +8,7 @@ import {onMount, onDestroy, tick}  from 'svelte'
 import { loadConversation, sendMessage, deleteMessage, editMessage, listenAndClearUnread} from '$lib/services/chat'
 import { auth } from '$lib/firebase/firebase';
 import { type UserState } from '$lib/stores/user';
-import { loadUsers } from '$lib/services/auth';
+import { loadUsers, usergoto } from '$lib/services/auth';
 import { usersStore } from '$lib/stores/users';
 import { loadMessages } from '$lib/services/messages';
 import { messagesStore, type MessageState } from '$lib/stores/messages';
@@ -17,6 +17,7 @@ import { presenceStore } from '$lib/stores/presence';
 import { loadUserPresence, setTyping, setRecording, setOnline } from '$lib/services/presence';
 import { formatLastSeen } from '$lib/utils/lastSeen';
 import { goto } from '$app/navigation';
+
 
 let loadingProfile = $state(false);
 let unsubscribe: (() => void) | undefined
@@ -64,6 +65,8 @@ $effect(() => {
 let chatUser = $state<UserState | null>(null);
 
 onMount(async () => {
+
+    await usergoto();
 
     setOnline();
     const conversation = await loadConversation(conversationId);

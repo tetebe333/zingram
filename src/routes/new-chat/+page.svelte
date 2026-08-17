@@ -3,7 +3,7 @@
 ChevronLeft, Search, MessageSquare, Plus 
 } from 'lucide-svelte';
 import { onMount, onDestroy, tick } from 'svelte';
-import { loadUsers } from '$lib/services/auth';
+import { loadUsers, usergoto} from '$lib/services/auth';
 import { usersStore } from '$lib/stores/users';
 import {goto} from '$app/navigation';
 import { type UserState } from '$lib/stores/user';
@@ -15,8 +15,9 @@ let unsubscribePresenceMap: (() => void) | undefined;
 let istLoading = $state(false)
 
  onMount(async () => {
+    
     istLoading = true;
-
+    await usergoto();
     try {
        
         if ($usersStore.users.length === 0) {

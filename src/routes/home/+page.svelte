@@ -12,7 +12,7 @@ import { onMount, onDestroy, tick } from 'svelte';
 import { userStore,  type UserState } from '$lib/stores/user';
 import { usersStore } from '$lib/stores/users';
 import { ConversationsStore } from '$lib/stores/conversation';
-import { loadCurrentUser, loadUsers, checkAndUpdateEmail} from '$lib/services/auth';
+import { loadCurrentUser, loadUsers, checkAndUpdateEmail, usergoto} from '$lib/services/auth';
 import { loadConversations} from '$lib/services/chat';
 import { loadMessages } from '$lib/services/messages';
 import { loadUsersPresence } from "$lib/services/presence";
@@ -86,6 +86,7 @@ const filteredConversations = $derived(
 );
 onMount(async () => {
     isLoading = true;
+    await usergoto();
     try {
         // Load current user
         if (!$userStore?.uid) {

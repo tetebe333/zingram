@@ -68,7 +68,7 @@ onMount(async () => {
 
     <div class="mt-8">
         <p class="text-gray-500 font-medium text-sm">By continuing, you agree to our</p>
-        <p class="text-gray-500 font-medium text-sm"> <a href="/" class="text-blue-500 hover:underline">Terms</a> & <a href="/privacy" class="text-blue-500 hover:underline">Privacy Policy</a></p>
+        <p class="text-gray-500 font-medium text-sm"> <a href="/terms" class="text-blue-500 hover:underline">Terms</a> & <a href="/terms" class="text-blue-500 hover:underline">Privacy Policy</a></p>
 </div>
 </div>
 

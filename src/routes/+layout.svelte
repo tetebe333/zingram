@@ -5,33 +5,8 @@
     import { auth } from '$lib/firebase/firebase';
 	import { setOffline, setOnline} from '$lib/services/presence';
 	import { loadCurrentUser, checkAndUpdateEmail } from '$lib/services/auth';
-    import { onAuthStateChanged, type User } from "firebase/auth";
-
-    export function waitForAuth(): Promise<User | null> {
-        return new Promise((resolve) => {
-            const unsubscribe = onAuthStateChanged(auth, (user) => {
-                unsubscribe();
-                resolve(user);
-            });
-        });
-    }
 
 onMount(() => {
-
-    async function usergoto() {
-        const currentUser = await waitForAuth();
-
-        try {
-            if (!currentUser) {
-                goto('/login');
-            }
-        } catch (error) {
-            console.error(error);
-        }
-    }
-
-    usergoto();
-
     async function handleAppStart() {
         // checking Firebase Auth for a possibly changed email
         await checkAndUpdateEmail();

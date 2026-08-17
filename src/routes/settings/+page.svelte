@@ -3,11 +3,12 @@ import { ArrowLeft, ChevronRight, LockKeyhole, Mail, Trash2, TriangleAlert, Send
 import { goto } from '$app/navigation';
 import { userStore } from '$lib/stores/user';
 import { onMount } from 'svelte';
-import { loadCurrentUser, emailExist, sendResetPasswordEmail, changePassword, changeEmail, verifyCurrentPassword, checkAndUpdateEmail, deleteAccount } from '$lib/services/auth';
+import { loadCurrentUser, emailExist, sendResetPasswordEmail, changePassword, changeEmail, verifyCurrentPassword, deleteAccount, usergoto } from '$lib/services/auth';
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { auth } from '$lib/firebase/firebase';
 
  onMount(async () => {
+    await usergoto();
     await loadCurrentUser()
  })
 
@@ -564,7 +565,7 @@ async function handleDeleteAccount() {
                     {/if}
                 </div>
 
-                <button onclick={handleDeleteAccount}
+                <button disabled={loading} onclick={handleDeleteAccount}
                 class="mt-6 w-full rounded-xl bg-red-500 py-3 font-semibold text-white transition hover:bg-[#E63F5B] flex justify-center items-center gap-2"
                 >
                     {#if loading}
