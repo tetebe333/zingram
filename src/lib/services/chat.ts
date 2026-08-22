@@ -167,6 +167,52 @@ export async function sendMessage(
                 currentRecipientUnread + 1
         }
     );
+
+    void fetch(
+        "/api/notifications/send",
+        {
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                recipientId,
+                senderId: currentUser.uid,
+                conversationId,
+
+                messageText:
+                    type === "text"
+                        ? text
+                        : `[${type}]`
+            })
+        }
+    )
+        .then(async (response) => {
+            const result =
+                await response.json();
+
+            if (!response.ok) {
+                console.error(
+                    "Notification endpoint failed:",
+                    result
+                );
+
+                return;
+            }
+
+            console.log(
+                "Notification sent in background:",
+                result
+            );
+        })
+        .catch((error) => {
+            console.error(
+                "Background notification request failed:",
+                error
+            );
+        });
 }
 
 export async function editMessage(

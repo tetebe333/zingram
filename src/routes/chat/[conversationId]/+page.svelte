@@ -94,7 +94,6 @@ onMount(async () => {
             user => user.uid === otherUserUid
         ) ?? null;
 
-        console.log('Initial chat user:', chatUser);
 
         unsubscribePresence = loadUserPresence(otherUserUid);
     }
@@ -110,7 +109,6 @@ onMount(async () => {
             user => user.uid === otherUserUid
         ) ?? null;
 
-        console.log('Updated chat user:', chatUser);
     }
 });
 

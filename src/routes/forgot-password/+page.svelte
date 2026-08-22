@@ -135,78 +135,78 @@ async function handleForgotPassword() {
         </a>
     </div>
 
-     {#if showNotification}
-    <div
-        class="fixed inset-0 z-100 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
-    >
+    {#if showNotification}
         <div
-            class="w-full max-w-sm rounded-2xl  bg-[#0B1220] border border-[#1A2742] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)]"
+            class="fixed inset-0 z-100 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
         >
-            <!-- Icon -->
             <div
-                class={`flex h-12 w-12 items-center justify-center rounded-full ${
-                    notificationType === 'success'
-                        ? 'bg-green-200'
-                        : 'bg-red-100'
-                }`}
+                class="w-full max-w-sm rounded-2xl  bg-[#0B1220] border border-[#1A2742] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)]"
             >
-                {#if notificationType === 'success'}
-                    <svg
-                        class="h-6 w-6 text-green-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2.5"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M5 13l4 4L19 7"
-                        />
-                    </svg>
-                {:else}
-                    <svg
-                        class="h-6 w-6 text-red-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2.5"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M12 9v4m0 4h.01M10.3 3.6l-7.1 12.3A2 2 0 005 19h14a2 2 0 001.8-3.1L13.7 3.6a2 2 0 00-3.4 0z"
-                        />
-                    </svg>
-                {/if}
+                <!-- Icon -->
+                <div
+                    class={`flex h-12 w-12 items-center justify-center rounded-full ${
+                        notificationType === 'success'
+                            ? 'bg-green-200'
+                            : 'bg-red-100'
+                    }`}
+                >
+                    {#if notificationType === 'success'}
+                        <svg
+                            class="h-6 w-6 text-green-600"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.5"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M5 13l4 4L19 7"
+                            />
+                        </svg>
+                    {:else}
+                        <svg
+                            class="h-6 w-6 text-red-600"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.5"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M12 9v4m0 4h.01M10.3 3.6l-7.1 12.3A2 2 0 005 19h14a2 2 0 001.8-3.1L13.7 3.6a2 2 0 00-3.4 0z"
+                            />
+                        </svg>
+                    {/if}
+                </div>
+
+                <!-- Text -->
+                <div class="mt-4">
+                    <h2 class="text-lg font-bold text-gray-200">
+                        {notificationTitle}
+                    </h2>
+
+                    <p class="mt-2 text-sm leading-6 text-gray-200">
+                        {notificationMessage}
+                    </p>
+                </div>
+
+                <!-- OK -->
+                <button
+                    type="button"
+                    onclick={closeNotification}
+                    class={`mt-6 w-full rounded-xl py-3 text-sm font-semibold text-white transition ${
+                        notificationType === 'success'
+                            ? 'bg-green-600 hover:bg-green-700'
+                            : 'bg-red-600 hover:bg-red-700'
+                    }`}
+                >
+                    OK
+                </button>
             </div>
-
-            <!-- Text -->
-            <div class="mt-4">
-                <h2 class="text-lg font-bold text-gray-200">
-                    {notificationTitle}
-                </h2>
-
-                <p class="mt-2 text-sm leading-6 text-gray-200">
-                    {notificationMessage}
-                </p>
-            </div>
-
-            <!-- OK -->
-            <button
-                type="button"
-                onclick={closeNotification}
-                class={`mt-6 w-full rounded-xl py-3 text-sm font-semibold text-white transition ${
-                    notificationType === 'success'
-                        ? 'bg-green-600 hover:bg-green-700'
-                        : 'bg-red-600 hover:bg-red-700'
-                }`}
-            >
-                OK
-            </button>
         </div>
-    </div>
-{/if} 
+    {/if} 
 
        
 

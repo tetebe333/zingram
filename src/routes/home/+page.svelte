@@ -100,7 +100,7 @@ onMount(async () => {
         }
 
         const users = $usersStore.users;
-
+        
         // Start presence listener
         unsubscribePresenceMap = loadUsersPresence(
             users.map((u) => u.uid)

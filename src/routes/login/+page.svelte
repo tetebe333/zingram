@@ -56,6 +56,7 @@ async function handleLogin(event: Event) {
         // Redirect to dashboard or home page after successful login
         goto('/home');
     } catch (error) {
+        console.log(error);
         showNotificationMessage(
             'Your Email or password is incorrect, If you think you forgot your passwor click forgot password to reset your password.',
             'error',
@@ -139,7 +140,7 @@ async function handleLogin(event: Event) {
         </a>
 
 
-        {#if showNotification}
+    {#if showNotification}
         <div
             class="fixed inset-0 z-100 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
         >

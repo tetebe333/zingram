@@ -13,6 +13,7 @@ import { setOnline } from './presence';
 import { loadUserPresence } from './presence';
 import { onAuthStateChanged, type User, sendPasswordResetEmail, updatePassword, verifyBeforeUpdateEmail, EmailAuthProvider, reauthenticateWithCredential , reload, deleteUser } from "firebase/auth";
 import { goto } from '$app/navigation';
+import { registerFCM, requestNotificationPermission } from '$lib/firebase/messaging';
 
 export function waitForAuth(): Promise<User | null> {
     return new Promise((resolve) => {
@@ -111,7 +112,11 @@ export async function registerUser(userInfo: RegisterUser) {
         updatedAt: serverTimestamp(),
     });
 
-    await loadCurrentUser()
+    await loadCurrentUser();
+
+    await requestNotificationPermission();
+
+    await registerFCM(user.uid);
 
     return user;
 }
@@ -160,7 +165,13 @@ export async function loginUser(email: string, password: string) {
         password
     );
 
-    return await loadCurrentUser()
+    await loadCurrentUser()
+
+    await requestNotificationPermission();
+
+    await registerFCM(userCredential.user.uid);
+
+    return userCredential.user
 }
 
 
