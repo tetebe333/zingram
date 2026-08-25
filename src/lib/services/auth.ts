@@ -88,7 +88,6 @@ export async function registerUser(userInfo: RegisterUser) {
         userInfo.password
     );
     const user = userCredential.user;
-
     // Save user details to Firestore
     await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
@@ -96,14 +95,13 @@ export async function registerUser(userInfo: RegisterUser) {
         dateOfBirth: userInfo.dob,
         email: userInfo.email,
         username: userInfo.username.toLowerCase(),
-        profileImage: userInfo.avatar, 
+        profileImage: userInfo.avatar,
         gender: userInfo.gender,
         bio: null,
         title: null,
         language: "English",
-        playbackSpeed: 1, 
-
-        website:  null,
+        playbackSpeed: 1,
+        website: null,
         facebook: null,
         instagram: null,
         whatsapp: null,
@@ -111,13 +109,21 @@ export async function registerUser(userInfo: RegisterUser) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
     });
-
     await loadCurrentUser();
-
-    await requestNotificationPermission();
-
-    await registerFCM(user.uid);
-
+    // Notification setup is optional.
+    // It must NEVER stop registration from succeeding.
+    try {
+        await requestNotificationPermission();
+        await registerFCM(user.uid);
+        console.log(
+            "Zingram notification registration completed."
+        );
+    } catch (error) {
+        console.warn(
+            "Zingram notification registration skipped:",
+            error
+        );
+    }
     return user;
 }
 
@@ -157,21 +163,33 @@ export async function emailExist(email: string): Promise<boolean> {
 }
 
 // Login user
-export async function loginUser(email: string, password: string) {
+export async function loginUser(
+    email: string,
+    password: string
+) {
     // Authenticate user
-    const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-    );
-
-    await loadCurrentUser()
-
-    await requestNotificationPermission();
-
-    await registerFCM(userCredential.user.uid);
-
-    return userCredential.user
+    const userCredential =
+        await signInWithEmailAndPassword(
+            auth,
+            email,
+            password
+        );
+    await loadCurrentUser();
+    // Notification setup is optional.
+    // It must NEVER stop login from succeeding.
+    try {
+        await requestNotificationPermission();
+        await registerFCM(userCredential.user.uid);
+        console.log(
+            "Zingram notification registration completed."
+        );
+    } catch (error) {
+        console.warn(
+            "Zingram notification registration skipped:",
+            error
+        );
+    }
+    return userCredential.user;
 }
 
 
