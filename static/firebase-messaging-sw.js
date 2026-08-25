@@ -1,4 +1,3 @@
-
 importScripts(
     "https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"
 );
@@ -50,8 +49,8 @@ messaging.onBackgroundMessage((payload) => {
             ? `${senderName} (${notificationCount})`
             : senderName;
     /*
-     * Use the sender's profile picture when
-     * one exists. Otherwise use Zingram's icon.
+     * Use sender profile picture.
+     * Fall back to Zingram logo.
      */
     const notificationIcon =
         senderProfileImage ||
@@ -71,3 +70,76 @@ messaging.onBackgroundMessage((payload) => {
         notificationOptions
     );
 });
+/*
+ * Notification click
+ *
+ * When the user taps the notification,
+ * open the exact conversation.
+ */
+self.addEventListener(
+    "notificationclick",
+    (event) => {
+        event.notification.close();
+        const data =
+            event.notification.data || {};
+        const conversationId =
+            data.conversationId;
+        if (!conversationId) {
+            console.warn(
+                "[firebase-messaging-sw.js] No conversationId found."
+            );
+            event.waitUntil(
+                clients.openWindow("/")
+            );
+            return;
+        }
+        const chatUrl =
+            `/chat/${conversationId}`;
+        event.waitUntil(
+            clients.matchAll({
+                type: "window",
+                includeUncontrolled: true
+            })
+            .then((clientList) => {
+                /*
+                 * If Zingram is already open,
+                 * reuse that window.
+                 */
+                for (const client of clientList) {
+                    if (
+                        "focus" in client &&
+                        client.url.includes("/chat/")
+                    ) {
+                        return client
+                            .navigate(chatUrl)
+                            .then(() => client.focus());
+                    }
+                }
+                /*
+                 * If Zingram is open somewhere else,
+                 * focus that window and navigate it.
+                 */
+                for (const client of clientList) {
+                    if (
+                        "focus" in client
+                    ) {
+                        return client
+                            .navigate(chatUrl)
+                            .then(() => client.focus());
+                    }
+                }
+                /*
+                 * Zingram is not open.
+                 * Open the exact chat directly.
+                 */
+                if (
+                    clients.openWindow
+                ) {
+                    return clients.openWindow(
+                        chatUrl
+                    );
+                }
+            })
+        );
+    }
+);
