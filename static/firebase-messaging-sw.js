@@ -2,7 +2,7 @@
  * Notification click
  *
  * IMPORTANT:
- * This must be registered BEFORE importing Firebase Messaging.
+ * Register this BEFORE importing Firebase Messaging.
  */
 self.addEventListener("notificationclick", (event) => {
     event.notification.close();
@@ -35,12 +35,14 @@ self.addEventListener("notificationclick", (event) => {
         .then((clientList) => {
 
             /*
-             * First look for an existing Zingram window.
+             * Look for an existing Zingram window.
              */
             for (const client of clientList) {
 
                 if (
-                    client.url.startsWith(self.location.origin) &&
+                    client.url.startsWith(
+                        self.location.origin
+                    ) &&
                     "focus" in client
                 ) {
                     return client
@@ -87,6 +89,9 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 
+/*
+ * Background notifications
+ */
 messaging.onBackgroundMessage((payload) => {
 
     console.log(
@@ -95,26 +100,62 @@ messaging.onBackgroundMessage((payload) => {
     );
 
 
+    /*
+     * Sender name
+     */
     const senderName =
         payload.data?.senderName ||
         payload.notification?.title ||
         "Zingram";
 
 
+    /*
+     * Message text
+     */
     const messageText =
         payload.data?.messageText ||
         payload.notification?.body ||
         "You received a new message.";
 
 
+    /*
+     * Sender ID
+     */
     const senderId =
         payload.data?.senderId;
 
 
+    /*
+     * Sender profile picture
+     *
+     * If the sender has a profile picture,
+     * use it.
+     *
+     * Otherwise use the Zingram logo.
+     */
     const senderProfileImage =
-        payload.data?.senderProfileImage || "";
+        payload.data?.senderProfileImage;
 
 
+    const notificationIcon =
+        senderProfileImage &&
+        senderProfileImage.trim() !== ""
+            ? senderProfileImage
+            : "/zingram-96x96.png.PNG";
+
+
+    /*
+     * Notification badge
+     *
+     * This remains the Zingram logo.
+     */
+    const notificationBadge =
+        "/zingram-48x48.png.PNG";
+
+
+    /*
+     * Notification count
+     */
     const notificationCount =
         Number(
             payload.data?.notificationCount || "1"
@@ -141,28 +182,41 @@ messaging.onBackgroundMessage((payload) => {
 
 
     /*
-     * Sender profile picture.
-     * Fall back to Zingram logo.
+     * Notification options
      */
-    const notificationIcon =
-        senderProfileImage ||
-        "/zingram-96x96.png.PNG";
-
-
     const notificationOptions = {
 
         body: messageText,
 
+        /*
+         * Sender profile picture
+         * OR Zingram logo fallback.
+         */
         icon: notificationIcon,
 
-        badge: "/zingram-48x48.png.PNG",
+        /*
+         * Zingram badge.
+         */
+        badge: notificationBadge,
 
+        /*
+         * Group notifications from
+         * the same sender.
+         */
         tag: notificationTag,
 
+        /*
+         * Keep the Firebase data so
+         * notificationclick can access
+         * conversationId.
+         */
         data: payload.data || {}
     };
 
 
+    /*
+     * Display notification.
+     */
     self.registration.showNotification(
         title,
         notificationOptions

@@ -1,22 +1,39 @@
 import { auth, db } from '$lib/firebase/firebase';
 import {
-  doc,
-  updateDoc,
-  serverTimestamp, onSnapshot
+    doc,
+    updateDoc,
+    serverTimestamp,
+    onSnapshot,
+    getDoc
 } from 'firebase/firestore';
+
 import { presenceStore } from '$lib/stores/presence';
-import { presenceMapStore } from "$lib/stores/presenceUsers";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { presenceMapStore } from '$lib/stores/presenceUsers';
+
+import {
+    onAuthStateChanged,
+    type User
+} from 'firebase/auth';
+
+
+// -----------------------------------------
+// WAIT FOR AUTH
+// -----------------------------------------
 
 export function waitForAuth(): Promise<User | null> {
     return new Promise((resolve) => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            unsubscribe();
-            resolve(user);
-        });
+        const unsubscribe =
+            onAuthStateChanged(auth, (user) => {
+                unsubscribe();
+                resolve(user);
+            });
     });
 }
 
+
+// -----------------------------------------
+// ONLINE / OFFLINE
+// -----------------------------------------
 
 export async function setOnline() {
     const currentUser = await waitForAuth();
@@ -24,13 +41,19 @@ export async function setOnline() {
     if (!currentUser) return;
 
     await updateDoc(
-        doc(db, 'userPresence', currentUser.uid),
+        doc(
+            db,
+            'userPresence',
+            currentUser.uid
+        ),
         {
             online: true,
-            lastSeen: serverTimestamp()
+            lastSeen:
+                serverTimestamp()
         }
     );
 }
+
 
 export async function setOffline() {
     const currentUser = await waitForAuth();
@@ -38,13 +61,109 @@ export async function setOffline() {
     if (!currentUser) return;
 
     await updateDoc(
-        doc(db, 'userPresence', currentUser.uid),
+        doc(
+            db,
+            'userPresence',
+            currentUser.uid
+        ),
         {
             online: false,
-            lastSeen: serverTimestamp()
+            lastSeen:
+                serverTimestamp()
         }
     );
 }
+
+
+// -----------------------------------------
+// CURRENT CONVERSATION
+// -----------------------------------------
+
+export async function setCurrentConversation(
+    conversationId: string
+) {
+    const currentUser = await waitForAuth();
+
+    if (!currentUser) return;
+
+    await updateDoc(
+        doc(
+            db,
+            'userPresence',
+            currentUser.uid
+        ),
+        {
+            currentConversationId:
+                conversationId,
+
+            lastActiveAt:
+                serverTimestamp()
+        }
+    );
+}
+
+
+export async function updateCurrentConversationActivity() {
+    const currentUser = await waitForAuth();
+
+    if (!currentUser) return;
+
+    await updateDoc(
+        doc(
+            db,
+            'userPresence',
+            currentUser.uid
+        ),
+        {
+            lastActiveAt:
+                serverTimestamp()
+        }
+    );
+}
+
+
+export async function clearCurrentConversation(
+    conversationId: string
+) {
+    const currentUser = await waitForAuth();
+
+    if (!currentUser) return;
+
+    const presenceRef =
+        doc(
+            db,
+            'userPresence',
+            currentUser.uid
+        );
+
+    const presenceSnap =
+        await getDoc(presenceRef);
+
+    if (!presenceSnap.exists()) return;
+
+    const presenceData =
+        presenceSnap.data();
+
+    if (
+        presenceData?.currentConversationId !==
+        conversationId
+    ) {
+        return;
+    }
+
+    await updateDoc(
+        presenceRef,
+        {
+            currentConversationId: null,
+            lastActiveAt: null
+        }
+    );
+}
+
+
+// -----------------------------------------
+// TYPING
+// -----------------------------------------
 
 export async function setTyping(
     isTyping: boolean,
@@ -55,13 +174,21 @@ export async function setTyping(
     if (!currentUser) return;
 
     await updateDoc(
-        doc(db, 'userPresence', currentUser.uid),
+        doc(
+            db,
+            'userPresence',
+            currentUser.uid
+        ),
         {
-            typing: isTyping,
-            currentConversationId: isTyping ? conversationId : null
+            typing: isTyping
         }
     );
 }
+
+
+// -----------------------------------------
+// RECORDING
+// -----------------------------------------
 
 export async function setRecording(
     isRecording: boolean,
@@ -72,13 +199,21 @@ export async function setRecording(
     if (!currentUser) return;
 
     await updateDoc(
-        doc(db, 'userPresence', currentUser.uid),
+        doc(
+            db,
+            'userPresence',
+            currentUser.uid
+        ),
         {
-            recording: isRecording,
-            currentConversationId: isRecording ? conversationId : null
+            recording: isRecording
         }
     );
 }
+
+
+// -----------------------------------------
+// UPDATE LAST SEEN
+// -----------------------------------------
 
 export async function updateLastSeen() {
     const currentUser = await waitForAuth();
@@ -86,62 +221,117 @@ export async function updateLastSeen() {
     if (!currentUser) return;
 
     await updateDoc(
-        doc(db, 'userPresence', currentUser.uid),
+        doc(
+            db,
+            'userPresence',
+            currentUser.uid
+        ),
         {
-            lastSeen: serverTimestamp()
+            lastSeen:
+                serverTimestamp()
         }
     );
 }
 
-export function loadUserPresence(uid: string) {
-    const presenceRef = doc(db, 'userPresence', uid);
 
-    return onSnapshot(presenceRef, (snapshot) => {
-        if (!snapshot.exists()) return;
+// -----------------------------------------
+// LOAD ONE USER PRESENCE
+// -----------------------------------------
 
-        const data = snapshot.data();
+export function loadUserPresence(
+    uid: string
+) {
+    const presenceRef =
+        doc(
+            db,
+            'userPresence',
+            uid
+        );
 
-        presenceStore.set({
-            ...data,
-            lastSeen: data.lastSeen?.toDate?.() ?? null
+    return onSnapshot(
+        presenceRef,
+        (snapshot) => {
+            if (!snapshot.exists()) return;
 
-        } as any);
-    });
+            const data =
+                snapshot.data();
+
+            presenceStore.set({
+                ...data,
+
+                lastSeen:
+                    data.lastSeen
+                        ?.toDate?.() ?? null
+            } as any);
+        }
+    );
 }
 
 
-export function loadUsersPresence(uids: string[]) {
-    const unsubscribers: (() => void)[] = [];
+// -----------------------------------------
+// LOAD MULTIPLE USERS PRESENCE
+// -----------------------------------------
+
+export function loadUsersPresence(
+    uids: string[]
+) {
+    const unsubscribers:
+        (() => void)[] = [];
 
     for (const uid of uids) {
+        const unsubscribe =
+            onSnapshot(
+                doc(
+                    db,
+                    'userPresence',
+                    uid
+                ),
+                (snapshot) => {
+                    if (!snapshot.exists()) return;
 
-        const unsubscribe = onSnapshot(
-            doc(db, "userPresence", uid),
-            (snapshot) => {
+                    const data =
+                        snapshot.data();
 
-                if (!snapshot.exists()) return;
+                    presenceMapStore.update(
+                        (current) => ({
+                            ...current,
 
-                const data = snapshot.data();
+                            [uid]: {
+                                online:
+                                    data.online ??
+                                    false,
 
-               presenceMapStore.update((current) => ({
-                ...current,
-                    [uid]: {
-                        online: data.online ?? false,
-                        typing: data.typing ?? false,
-                        recording: data.recording ?? false,
-                        currentConversationId:
-                            data.currentConversationId ?? null,
-                        lastSeen:
-                            data.lastSeen?.toDate?.() ?? null
-                    }
-                }));
-            }
+                                typing:
+                                    data.typing ??
+                                    false,
+
+                                recording:
+                                    data.recording ??
+                                    false,
+
+                                currentConversationId:
+                                    data.currentConversationId ??
+                                    null,
+
+                                lastSeen:
+                                    data.lastSeen
+                                        ?.toDate?.() ??
+                                    null
+                            }
+                        })
+                    );
+                }
+            );
+
+        unsubscribers.push(
+            unsubscribe
         );
-
-        unsubscribers.push(unsubscribe);
     }
 
     return () => {
-        unsubscribers.forEach((unsub) => unsub());
+        unsubscribers.forEach(
+            (unsubscribe) =>
+                unsubscribe()
+        );
     };
 }

@@ -14,7 +14,7 @@ import { loadMessages } from '$lib/services/messages';
 import { messagesStore, type MessageState } from '$lib/stores/messages';
 import { uploadAudio, uploadImage, uploadVideo, uploadDocument} from '$lib/services/cloudinary';
 import { presenceStore } from '$lib/stores/presence';
-import { loadUserPresence, setTyping, setRecording, setOnline } from '$lib/services/presence';
+import { loadUserPresence, setTyping, setRecording, setOnline, setCurrentConversation, clearCurrentConversation, updateCurrentConversationActivity } from '$lib/services/presence';
 import { formatLastSeen } from '$lib/utils/lastSeen';
 import { goto } from '$app/navigation';
 
@@ -23,12 +23,31 @@ let loadingProfile = $state(false);
 let unsubscribe: (() => void) | undefined
 let unsubscribeUnread: (() => void) | undefined
 let unsubscribePresence: (() => void) | undefined
+let conversationActivityInterval: ReturnType<typeof setInterval> | null = null;
 
 const conversationId = $derived(page.params.conversationId as string);
 const currentMessages = $derived(
     $messagesStore[conversationId] ?? []
 );
 
+
+
+function stopConversationActivity() {
+    if (conversationActivityInterval) {
+        clearInterval(conversationActivityInterval);
+        conversationActivityInterval = null;
+    }
+}
+
+function startConversationActivity() {
+    stopConversationActivity();
+
+    updateCurrentConversationActivity();
+
+    conversationActivityInterval = setInterval(() => {
+        updateCurrentConversationActivity();
+    }, 30000);
+}
 
 function scrollToBottom() {
     if (!messageContainer) return;
@@ -79,6 +98,10 @@ onMount(async () => {
         return;
     }
 
+    await setCurrentConversation(conversationId)
+
+    startConversationActivity();
+    
     unsubscribeUnread = listenAndClearUnread(
         conversationId,
         currentUid
@@ -113,8 +136,12 @@ onMount(async () => {
 });
 
 onDestroy(() => {
+    if (conversationActivityInterval) {
+        clearInterval(conversationActivityInterval);
+    }
     setTyping(false, conversationId);
     setRecording(false, conversationId);
+    clearCurrentConversation(conversationId);
     // Stop Firestore listener
     unsubscribe?.();
     unsubscribeUnread?.();
