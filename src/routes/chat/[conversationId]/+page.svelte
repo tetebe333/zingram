@@ -29,6 +29,15 @@ const conversationId = $derived(page.params.conversationId as string);
 const currentMessages = $derived(
     $messagesStore[conversationId] ?? []
 );
+const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+            startConversationActivity();
+            setCurrentConversation(conversationId);
+        } else {
+            stopConversationActivity();
+        }
+};
+
 
 
 
@@ -83,59 +92,89 @@ $effect(() => {
 
 let chatUser = $state<UserState | null>(null);
 
-onMount(async () => {
-
-    await usergoto();
-
-    setOnline();
-    const conversation = await loadConversation(conversationId);
-
-    unsubscribe = loadMessages(conversationId);
-
-    const currentUid = auth.currentUser?.uid;
-
-    if (!currentUid) {
-        return;
-    }
-
-    await setCurrentConversation(conversationId)
-
-    startConversationActivity();
-    
-    unsubscribeUnread = listenAndClearUnread(
-        conversationId,
-        currentUid
+onMount(() => {
+    document.addEventListener(
+        'visibilitychange',
+        handleVisibilityChange
     );
 
-    const otherUserUid = conversation.participants.find(
-        uid => uid !== currentUid
-    );
+    async function initializeChat() {
+        try {
+            await usergoto();
 
-    if (otherUserUid) {
-        // 1️⃣ First: use whatever users are already loaded
-        chatUser = $usersStore.users.find(
-            user => user.uid === otherUserUid
-        ) ?? null;
+            const currentUid = auth.currentUser?.uid;
 
+            if (!currentUid) {
+                return;
+            }
 
-        unsubscribePresence = loadUserPresence(otherUserUid);
+            // Make sure users are loaded before looking for chatUser.
+            await loadUsers();
+
+            const conversation =
+                await loadConversation(conversationId);
+
+            unsubscribe = loadMessages(conversationId);
+
+            await setOnline();
+
+            await setCurrentConversation(
+                conversationId
+            );
+
+            startConversationActivity();
+
+            unsubscribeUnread =
+                listenAndClearUnread(
+                    conversationId,
+                    currentUid
+                );
+
+            const otherUserUid =
+                conversation.participants.find(
+                    (uid) => uid !== currentUid
+                );
+
+            if (otherUserUid) {
+                chatUser =
+                    $usersStore.users.find(
+                        (user) =>
+                            user.uid === otherUserUid
+                    ) ?? null;
+
+                unsubscribePresence =
+                    loadUserPresence(
+                        otherUserUid
+                    );
+            }
+
+            await tick();
+
+            scrollToBottom();
+        } catch (error) {
+            console.error(
+                'Failed to initialize chat:',
+                error
+            );
+        }
     }
 
-    await tick();
-    scrollToBottom();
+    initializeChat();
 
-    await loadUsers();
-
-    // 3️⃣ After loading: find the user again
-    if (otherUserUid) {
-        chatUser = $usersStore.users.find(
-            user => user.uid === otherUserUid
-        ) ?? null;
-
-    }
+    return () => {
+        document.removeEventListener(
+            'visibilitychange',
+            handleVisibilityChange
+        );
+    };
 });
 
 onDestroy(() => {
+    document.removeEventListener(
+        'visibilitychange',
+        handleVisibilityChange
+    );
+
     if (conversationActivityInterval) {
         clearInterval(conversationActivityInterval);
     }

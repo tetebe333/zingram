@@ -16,92 +16,73 @@
 	} from '$lib/firebase/messaging';
 
 	onMount(() => {
-		async function refreshNotificationRegistration() {
-			try {
-				const currentUser = await waitForAuth();
+    async function refreshNotificationRegistration() {
+        try {
+            const currentUser = await waitForAuth();
 
-				if (!currentUser) {
-					return;
-				}
+            if (!currentUser) return;
 
-				if (typeof Notification === 'undefined') {
-					return;
-				}
+            await registerFCM(currentUser.uid);
+        } catch (error) {
+            console.warn(
+                'Notification registration skipped:',
+                error
+            );
+        }
+    }
 
-				// Do not request permission here.
-				// Login/register handles that.
-				if (Notification.permission !== 'granted') {
-					return;
-				}
+    async function handleAppStart() {
+        try {
+            await checkAndUpdateEmail();
+            await loadCurrentUser();
+            await setOnline();
+            await refreshNotificationRegistration();
 
-				await registerFCM(currentUser.uid);
+            listenForForegroundMessages();
+        } catch (error) {
+            console.error(
+                'Failed to initialize Zingram:',
+                error
+            );
+        }
+    }
 
-				console.log(
-					'Zingram notification registration refreshed.'
-				);
-			} catch (error) {
-				console.error(
-					'Notification registration refresh failed:',
-					error
-				);
-			}
-		}
+    // Start initialization without making onMount itself async.
+    handleAppStart();
 
-		function startForegroundNotifications() {
-			try {
-				listenForForegroundMessages();
+    const handleVisibilityChange = async () => {
+        if (document.visibilityState === 'hidden') {
+            await setOffline();
+            return;
+        }
 
-				console.log(
-					'Zingram foreground notification listener started.'
-				);
-			} catch (error) {
-				console.error(
-					'Foreground notification listener failed:',
-					error
-				);
-			}
-		}
+        if (document.visibilityState === 'visible') {
+            try {
+                await checkAndUpdateEmail();
+                await loadCurrentUser();
+                await setOnline();
+                await refreshNotificationRegistration();
+            } catch (error) {
+                console.error(
+                    'Failed to restore Zingram state:',
+                    error
+                );
+            }
+        }
+    };
 
-		async function handleAppStart() {
-			await checkAndUpdateEmail();
+    document.addEventListener(
+        'visibilitychange',
+        handleVisibilityChange
+    );
 
-			await loadCurrentUser();
-
-			await setOnline();
-
-			await refreshNotificationRegistration();
-
-			startForegroundNotifications();
-		}
-
-		handleAppStart();
-
-		const handleVisibilityChange = async () => {
-			if (document.visibilityState === 'hidden') {
-				await setOffline();
-			} else if (document.visibilityState === 'visible') {
-				await checkAndUpdateEmail();
-
-				await loadCurrentUser();
-
-				await setOnline();
-
-				await refreshNotificationRegistration();
-			}
-		};
-
-		document.addEventListener(
-			'visibilitychange',
-			handleVisibilityChange
-		);
-
-		return () => {
-			document.removeEventListener(
-				'visibilitychange',
-				handleVisibilityChange
-			);
-		};
-	});
+    return () => {
+        document.removeEventListener(
+            'visibilitychange',
+            handleVisibilityChange
+        );
+    };
+});
 
 	let { children } = $props();
 </script>

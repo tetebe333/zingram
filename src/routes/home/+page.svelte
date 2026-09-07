@@ -84,46 +84,74 @@ const filteredConversations = $derived(
             .includes(query);
     })
 );
-onMount(async () => {
+
+onMount(() => {
     isLoading = true;
-    await usergoto();
-    try {
-        // Load current user
-        if (!$userStore?.uid) {
-            await checkAndUpdateEmail()
-            await loadCurrentUser();
-        }
 
-        // Load users
-        if ($usersStore.users.length === 0) {
+    async function initializeHome() {
+        try {
+            // 1. Make sure authentication is ready.
+            await usergoto();
+
+            // 2. Make sure the current user's store is ready.
+            if (!$userStore?.uid) {
+                await checkAndUpdateEmail();
+                await loadCurrentUser();
+            }
+
+            // 3. Load users and wait for the first Firestore snapshot.
             await loadUsers();
+
+            // 4. Load conversations and wait for the first snapshot.
+            unsubscribeConversations =
+                await loadConversations();
+
+            // 5. Stop any old presence listeners before creating
+            //    the Home presence listeners.
+            unsubscribePresenceMap?.();
+
+            // 6. Only listen to presence for users who are actually
+            //    participants in the current conversations.
+            const currentUid = $userStore?.uid;
+
+            const conversationUserIds = [
+                ...new Set(
+                    $ConversationsStore.flatMap(
+                        (conversation) =>
+                            conversation.participants
+                    ).filter(
+                        (uid) => uid && uid !== currentUid
+                    )
+                )
+            ];
+
+            if (conversationUserIds.length > 0) {
+                unsubscribePresenceMap =
+                    loadUsersPresence(
+                        conversationUserIds
+                    );
+            }
+
+            // 7. Load messages after conversations are ready.
+            unsubscribeMessages =
+                $ConversationsStore.map(
+                    (conversation) =>
+                        loadMessages(conversation.id)
+                );
+
+        } catch (error) {
+            console.error(
+                'Failed to initialize Home:',
+                error
+            );
+        } finally {
+            isLoading = false;
         }
-
-        const users = $usersStore.users;
-        
-        // Start presence listener
-        unsubscribePresenceMap = loadUsersPresence(
-            users.map((u) => u.uid)
-        );
-
-        
-        // Start conversations listener
-        unsubscribeConversations = await loadConversations();
-
-        // Start loading messages for existing conversations in the background
-        unsubscribeMessages = $ConversationsStore.map((conversation) =>
-            loadMessages(conversation.id)
-        );
-
-    } catch (error) {
-        console.error(
-            'Failed to initialize home screen:',
-            error
-        );
-    } finally {
-        isLoading = false;
     }
+
+    initializeHome();
 });
+
 onDestroy(() => {
     unsubscribeConversations?.();
     unsubscribePresenceMap?.();

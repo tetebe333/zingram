@@ -1,8 +1,7 @@
 <script lang="ts">
-import { auth } from '$lib/firebase/firebase';
 import { page } from '$app/state';
 import { goto } from '$app/navigation';
-import { ArrowLeft, Ban, Clock, MessageCircle, SquareArrowOutUpRight, VenusAndMars, Calendar, Globe} from 'lucide-svelte';
+import { ArrowLeft, Link, Ban, Clock, MessageCircle, SquareArrowOutUpRight, VenusAndMars, Calendar, Globe} from 'lucide-svelte';
 import { onMount, onDestroy } from 'svelte';
 import { loadCurrentUser, usergoto } from '$lib/services/auth';
 import { usersStore } from '$lib/stores/users';
@@ -188,7 +187,7 @@ async function openChat(uid:string) {
         {#if user.website}
             <div class="flex justify-between pb-3 items-center border-b border-[#202D46] w-full">
                 <div class="flex gap-3 items-center">
-                <img src="/icons8-link-50.png" alt="" class="h-5 w-5 ">
+                <Link size="19" class="text-blue-500"/>
                     <p>Website</p>
                 </div>
 
@@ -247,12 +246,29 @@ async function openChat(uid:string) {
                    <a href={`https://wa.me/${user.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hi ${user.username}, it's ${$userStore?.fullName} from Zingram.`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="text-blue-600 hover:underline"
+                    class="flex gap-3 items-center hover:underline text-blue-600 underline sm:no-underline"
                     >
                         {user.username}.whatsApp.com
+                        <SquareArrowOutUpRight class="text-Lmuted" size="15"/>
                     </a>
                 </div>
 
+            </div>
+        {/if}
+
+        {#if user.email}
+            <div class="flex justify-between pb-3 items-center border-b border-[#202D46] w-full">
+                <div class="flex gap-3 items-center">
+                <img src="/gmail-48.png" alt="" class="h-5 w-5 ">
+                    <p>Email</p>
+                </div>
+
+                <div>
+                    <a href="mailto:{user.email}" target="_blank" class="flex gap-3 items-center hover:underline text-blue-600 underline sm:no-underline">
+                        {user.email}
+                        <SquareArrowOutUpRight class="text-Lmuted" size="15"/>
+                    </a>
+                </div>
             </div>
         {/if}
        

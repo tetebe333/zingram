@@ -255,7 +255,7 @@ function openHome() {
             <div class="flex justify-between py-4 items-center border-b border-[#202D46]">
 
                 <div class="flex gap-3 items-center text-gray-300">
-                    <Link size="19" />
+                    <Link size="19" class="text-blue-500"/>
                     <span>Website</span>
                 </div>
 
@@ -353,6 +353,33 @@ function openHome() {
                         class="text-blue-400 hover:underline max-w-[55%] truncate underline sm:no-underline"
                     >
                         {$userStore.whatsapp}
+                    </a>
+                {:else}
+                    <button onclick={openEditProfile} class="text-blue-400 underline max-w-[55%] truncate">Add whatsapp</button>
+
+                {/if}
+            </div>
+
+            <!-- gmail -->
+            <div class="flex justify-between py-4 items-center border-b border-[#202D46]">
+
+                <div class="flex gap-3 items-center text-gray-300">
+                    <img
+                        src="/gmail-48.png"
+                        alt="gmail"
+                        class="h-5 w-5"
+                    />
+                    <span>Email</span>
+                </div>
+
+                {#if $userStore?.email}
+                    <a
+                        href="mailto:{$userStore.email}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-blue-400 hover:underline max-w-[55%] truncate underline sm:no-underline"
+                    >
+                        {$userStore.email}
                     </a>
                 {:else}
                     <button onclick={openEditProfile} class="text-blue-400 underline max-w-[55%] truncate">Add whatsapp</button>
