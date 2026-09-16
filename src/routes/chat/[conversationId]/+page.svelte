@@ -311,6 +311,7 @@ let menuY = $state(0);
 //long prss sting
 let longPressTimer: ReturnType<typeof setTimeout> | undefined;
 let longPressTriggered = false;
+let ignoreNextClick = false;
 
 //scrow down let
 let showScrollToBottom = $state(false);
@@ -1132,6 +1133,11 @@ function startLongPress(event: TouchEvent, message: MessageState) {
 
     longPressTimer = setTimeout(() => {
         longPressTriggered = true;
+        ignoreNextClick = true;
+
+        setTimeout(() => {
+            ignoreNextClick = false;
+        }, 1000);
 
         const touch = event.touches[0] || event.changedTouches[0];
         if (!touch) return;
@@ -1184,10 +1190,18 @@ function cancelLongPress() {
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="relative" onclick={()=> {
-    showAttachmentMenu = false;
-    closeMessageMenu();
-}}>
+<div
+	class="relative"
+	onclick={() => {
+		if (ignoreNextClick) {
+			ignoreNextClick = false;
+			return;
+		}
+
+		showAttachmentMenu = false;
+		closeMessageMenu();
+	}}
+>
     <div class="py-3  fixed z-40 w-full justify-between border-b border-b-white/5  bg-[#010713] flex px-4">
 
         {#if loadingProfile}
