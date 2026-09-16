@@ -2,7 +2,7 @@
 //svelte-ignore non_reactive_update
 let messageContainer: HTMLDivElement;
 import { 
-ArrowLeft, MessageCircleMore, ChevronDown, Plus, Ban, SquarePen, Camera, Mic , Image , Video, FileText, Send, X, Trash2,Square , Play,} from 'lucide-svelte';
+ArrowLeft, MessageCircleMore, ChevronDown, Files, Plus, Ban, SquarePen, Camera, Mic , Image , Video, FileText, Send, X, Trash2,Square , Play,} from 'lucide-svelte';
 import { page }  from '$app/state' 
 import {onMount, onDestroy, tick}  from 'svelte'
 import { loadConversation, sendMessage, deleteMessage, editMessage, listenAndClearUnread} from '$lib/services/chat'
@@ -303,9 +303,8 @@ let isTyping = $state(false);
 //message menu
 let showMessageMenu = $state(false);
 let selectedMessage = $state<MessageState | null>(null);
+let showOtherMessageMenu = $state(false);
 
-let menuX = $state(0);
-let menuY = $state(0);
 
 
 //long prss sting
@@ -1012,28 +1011,6 @@ function openMessageMenu(event: MouseEvent, message: MessageState) {
     const menuHeight = 110;
     const padding = 12;
 
-    let x = event.clientX;
-    let y = event.clientY;
-
-    if (x + menuWidth > window.innerWidth - padding) {
-        x = window.innerWidth - menuWidth - padding;
-    }
-
-    if (y + menuHeight > window.innerHeight - padding) {
-        y = window.innerHeight - menuHeight - padding;
-    }
-
-    if (x < padding) {
-        x = padding;
-    }
-
-    if (y < padding) {
-        y = padding;
-    }
-
-    menuX = x;
-    menuY = y;
-
     showMessageMenu = true;
 }
 
@@ -1144,31 +1121,6 @@ function startLongPress(event: TouchEvent, message: MessageState) {
 
         selectedMessage = message;
 
-        const menuWidth = 168;
-        const menuHeight = 110;
-        const padding = 12;
-
-        let x = touch.clientX;
-        let y = touch.clientY;
-
-        if (x + menuWidth > window.innerWidth - padding) {
-            x = window.innerWidth - menuWidth - padding;
-        }
-
-        if (y + menuHeight > window.innerHeight - padding) {
-            y = window.innerHeight - menuHeight - padding;
-        }
-
-        if (x < padding) {
-            x = padding;
-        }
-
-        if (y < padding) {
-            y = padding;
-        }
-
-        menuX = x;
-        menuY = y;
 
         showMessageMenu = true;
     }, 500);
@@ -1179,6 +1131,52 @@ function cancelLongPress() {
         clearTimeout(longPressTimer);
         longPressTimer = undefined;
     }
+}
+
+async function copyMessageText() {
+	if (!selectedMessage?.text) return;
+
+	try {
+		await navigator.clipboard.writeText(selectedMessage.text);
+	} catch (error) {
+		console.error("❌ Failed to copy message:", error);
+	} finally {
+		closeMessageMenu();
+		closeOtherMessageMenu();
+	}
+}
+
+function openOtherMessageMenu(event: MouseEvent, message: MessageState) {
+	event.preventDefault();
+
+	selectedMessage = message;
+
+	showOtherMessageMenu = true;
+}
+
+function startOtherLongPress(event: TouchEvent, message: MessageState) {
+	longPressTriggered = false;
+
+	longPressTimer = setTimeout(() => {
+		longPressTriggered = true;
+		ignoreNextClick = true;
+
+		setTimeout(() => {
+			ignoreNextClick = false;
+		}, 1000);
+
+		const touch = event.touches[0] || event.changedTouches[0];
+		if (!touch) return;
+
+		selectedMessage = message;
+
+		showOtherMessageMenu = true;
+	}, 500);
+}
+
+function closeOtherMessageMenu() {
+	showOtherMessageMenu = false;
+	selectedMessage = null;
 }
 
 
@@ -1200,6 +1198,7 @@ function cancelLongPress() {
 
 		showAttachmentMenu = false;
 		closeMessageMenu();
+        closeOtherMessageMenu();
 	}}
 >
     <div class="py-3  fixed z-40 w-full justify-between border-b border-b-white/5  bg-[#010713] flex px-4">
@@ -1448,6 +1447,7 @@ function cancelLongPress() {
                                 class="flex items-center gap-1"
                             >
 
+                            
                                 {#if message.editedAt && message.type !== 'deleted'}
                                     <p class="text-[10px] mt-1 opacity-70 italic">
                                         edited
@@ -1473,6 +1473,11 @@ function cancelLongPress() {
                 <div class="flex justify-start mb-3 w-full min-w-0">
 
                     <div
+                        ontouchstart={(e) => startOtherLongPress(e, message)}
+                        ontouchend={cancelLongPress}
+                        ontouchcancel={cancelLongPress}
+                        ontouchmove={cancelLongPress}
+                        oncontextmenu={(e) => openOtherMessageMenu(e, message)}
                         class="bg-[#1F2937] text-white px-4 py-2 rounded-2xl w-fit max-w-[85%] min-w-0 rounded-bl-none"
                     >
 
@@ -2062,8 +2067,19 @@ function cancelLongPress() {
 
             {:else}
 
+                {#if selectedMessage?.text}
+                    <button
+                        onclick={copyMessageText}
+                        class="w-full px-4 py-3 hover:bg-white/5 transition flex items-center gap-2"
+                    >
+                        <Files  size="17" />
+                        <span>Copy</span>
+                    </button>
+                {/if}
+
                 {#if canEditMessage(selectedMessage!) && selectedMessage?.text !== null}
-                    <button onclick={()=>startEditMessage(selectedMessage!)}
+                    <button
+                        onclick={() => startEditMessage(selectedMessage!)}
                         class="w-full px-4 py-3 hover:bg-white/5 transition flex items-center gap-2"
                     >
                         <SquarePen size="17" />
@@ -2071,7 +2087,7 @@ function cancelLongPress() {
                     </button>
                 {/if}
 
-               <button
+                <button
                     onclick={async () => {
                         if (!selectedMessage) return;
                         await deleteMessage(selectedMessage.id);
@@ -2088,9 +2104,28 @@ function cancelLongPress() {
         </div>
     {/if}
 
-     {#if showMessageMenu}
-       <div class="fixed inset-0 z-45 w-full h-full bg-black/30 backdrop-blur-sm"></div>
+    {#if showOtherMessageMenu}
+
+        
+        <div
+            onclick={(e) => e.stopPropagation()}
+            class="fixed z-50 bottom-10 left-5 w-52 rounded-2xl border border-[#202D46] bg-[#0B1220] text-white shadow-xl"
+        >
+            {#if selectedMessage?.text?.trim()}
+                <button
+                    onclick={copyMessageText}
+                    class="w-full px-4 py-3 hover:bg-white/5 transition flex items-center gap-2"
+                >
+                    <Files size="17" />
+                    <span>Copy</span>
+                </button>
+            {/if}
+        </div>
     {/if}
+
+     {#if showMessageMenu || showOtherMessageMenu}
+	<div class="fixed inset-0 z-45 w-full h-full bg-black/30 backdrop-blur-sm"></div>
+{/if}
    
 
     <!-- show new message arrow -->
@@ -2144,3 +2179,18 @@ function cancelLongPress() {
    
 
 </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
