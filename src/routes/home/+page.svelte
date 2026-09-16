@@ -45,9 +45,9 @@ function startLongPress(
         longPressTriggered = true;
         ignoreNextClick = true;
 
-        setTimeout(() => {
-            ignoreNextClick = false;
-        }, 1000);
+        const touch = event.touches[0] || event.changedTouches[0];
+
+        if (!touch) return;
 
         openContextMenu(userId, selctedConversationIdP);
     }, 500);
@@ -244,25 +244,32 @@ function openMyProfile() {
                 )}
                 {@const unreadCount = conversation.unread?.[$userStore?.uid ?? ''] ?? 0}
                 {#if conversation.lastMessage}
-                     <button 
-                    onclick={() => {
-                        if (ignoreNextClick || longPressTriggered) {
-                            ignoreNextClick = false;
-                            longPressTriggered = false;
-                            return;
-                        }
+                    <button 
+                        onclick={(e) => {
+                            if (ignoreNextClick || longPressTriggered) {
+                                e.preventDefault();
+                                e.stopPropagation();
 
-                        goto(`/chat/${conversation.id}`);
-                    }}
-                    oncontextmenu={(e) => {
+                                ignoreNextClick = false;
+                                longPressTriggered = false;
+
+                                return;
+                            }
+
+                            goto(`/chat/${conversation.id}`);
+                        }}
+                        oncontextmenu={(e) => {
                             e.preventDefault();
                             openContextMenu(conversationUser!.uid, conversation.id);
                         }}
-                        ontouchstart={(e) => startLongPress(e, conversationUser!.uid, conversation.id)}
+                        ontouchstart={(e) =>
+                            startLongPress(e, conversationUser!.uid, conversation.id)
+                        }
                         ontouchend={cancelLongPress}
                         ontouchmove={cancelLongPress}
                         ontouchcancel={cancelLongPress}
-                    class="flex w-full items-center justify-between gap-3 text-white border-b border-gray-800 py-4">
+                        class="flex w-full items-center justify-between gap-3 text-white border-b border-gray-800 py-4"
+                    >
                         <!-- Left side -->
                         <div class="flex flex-1 min-w-0 relative justify-start items-start gap-3">
                             <img
