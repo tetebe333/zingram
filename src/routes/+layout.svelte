@@ -128,11 +128,12 @@
 	/>
 </svelte:head>
 
-{@render children()}
+<div class="app-no-select">
+	{@render children()}
+</div>
 
 <style>
-	:global(html),
-	:global(body) {
+	:global(.app-no-select) {
 		user-select: none;
 		-webkit-user-select: none;
 		-moz-user-select: none;
