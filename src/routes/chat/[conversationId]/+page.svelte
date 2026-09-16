@@ -1007,29 +1007,25 @@ function openMessageMenu(event: MouseEvent, message: MessageState) {
 
     selectedMessage = message;
 
-    const menuWidth = 168;   // w-42 = 10.5rem = 168px
-    const menuHeight = 110;  // Approximate height of 2 buttons
+    const menuWidth = 168;
+    const menuHeight = 110;
     const padding = 12;
 
     let x = event.clientX;
     let y = event.clientY;
 
-    // Right edge
     if (x + menuWidth > window.innerWidth - padding) {
         x = window.innerWidth - menuWidth - padding;
     }
 
-    // Bottom edge
     if (y + menuHeight > window.innerHeight - padding) {
         y = window.innerHeight - menuHeight - padding;
     }
 
-    // Left edge
     if (x < padding) {
         x = padding;
     }
 
-    // Top edge
     if (y < padding) {
         y = padding;
     }
@@ -1039,6 +1035,7 @@ function openMessageMenu(event: MouseEvent, message: MessageState) {
 
     showMessageMenu = true;
 }
+
 function closeMessageMenu() {
     showMessageMenu = false;
     selectedMessage = null;
@@ -1136,21 +1133,38 @@ function startLongPress(event: TouchEvent, message: MessageState) {
     longPressTimer = setTimeout(() => {
         longPressTriggered = true;
 
-        // Prevent browser context menu
-        event.preventDefault();
-
         const touch = event.touches[0] || event.changedTouches[0];
         if (!touch) return;
 
-        // Reuse your existing menu
-        openMessageMenu(
-            {
-                preventDefault: () => {},
-                clientX: touch.clientX,
-                clientY: touch.clientY
-            } as MouseEvent,
-            message
-        );
+        selectedMessage = message;
+
+        const menuWidth = 168;
+        const menuHeight = 110;
+        const padding = 12;
+
+        let x = touch.clientX;
+        let y = touch.clientY;
+
+        if (x + menuWidth > window.innerWidth - padding) {
+            x = window.innerWidth - menuWidth - padding;
+        }
+
+        if (y + menuHeight > window.innerHeight - padding) {
+            y = window.innerHeight - menuHeight - padding;
+        }
+
+        if (x < padding) {
+            x = padding;
+        }
+
+        if (y < padding) {
+            y = padding;
+        }
+
+        menuX = x;
+        menuY = y;
+
+        showMessageMenu = true;
     }, 500);
 }
 
@@ -1260,13 +1274,13 @@ function cancelLongPress() {
                 <!-- MY MESSAGE -->
                 <div class="flex justify-end mb-3 w-full min-w-0">
 
-                    <div 
-                    ontouchstart={(e)=> startLongPress(e, message)}
-                    ontouchend={cancelLongPress}
-                    ontouchcancel={cancelLongPress}
-                    ontouchmove={cancelLongPress}
-                    oncontextmenu={(e) => openMessageMenu(e, message)}
-                        class="bg-blue-700 px-4 py-2 text-white  rounded-2xl w-fit max-w-[85%] min-w-0 rounded-br-none"
+                    <div
+                        ontouchstart={(e) => startLongPress(e, message)}
+                        ontouchend={cancelLongPress}
+                        ontouchcancel={cancelLongPress}
+                        ontouchmove={cancelLongPress}
+                        oncontextmenu={(e) => openMessageMenu(e, message)}
+                        class="bg-blue-700 px-4 py-2 text-white rounded-2xl w-fit max-w-[85%] min-w-0 rounded-br-none"
                     >
 
                         {#if message.type === 'deleted'}
