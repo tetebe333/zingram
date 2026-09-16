@@ -29,7 +29,6 @@ let selectedUserID = $state<string | null>(null);
 let showContextMenu = $state(false);
 let longPressTimer: ReturnType<typeof setTimeout> | undefined;
 let longPressTriggered = false;
-let ignoreNextClick = false;
 let selctedConversationId = $state<string | null>(null);
 let search = $state('')
 
@@ -43,13 +42,11 @@ function startLongPress(
 
     longPressTimer = setTimeout(() => {
         longPressTriggered = true;
-        ignoreNextClick = true;
 
-        const touch = event.touches[0] || event.changedTouches[0];
-
-        if (!touch) return;
-
-        openContextMenu(userId, selctedConversationIdP);
+        openContextMenu(
+            userId,
+            selctedConversationIdP
+        );
     }, 500);
 }
 
@@ -244,15 +241,14 @@ function openMyProfile() {
                 )}
                 {@const unreadCount = conversation.unread?.[$userStore?.uid ?? ''] ?? 0}
                 {#if conversation.lastMessage}
-                    <button 
+                    <div
+                        role="button"
+                        tabindex="0"
                         onclick={(e) => {
-                            if (ignoreNextClick || longPressTriggered) {
+                            if (longPressTriggered) {
                                 e.preventDefault();
                                 e.stopPropagation();
-
-                                ignoreNextClick = false;
                                 longPressTriggered = false;
-
                                 return;
                             }
 
@@ -324,7 +320,7 @@ function openMyProfile() {
                             {/if}
 
                         </div>
-                    </button>
+                    </div>
                 {/if}
             {/each}
 
