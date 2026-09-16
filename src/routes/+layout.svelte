@@ -129,3 +129,13 @@
 </svelte:head>
 
 {@render children()}
+
+<style>
+	:global(html),
+	:global(body) {
+		user-select: none;
+		-webkit-user-select: none;
+		-moz-user-select: none;
+		-ms-user-select: none;
+	}
+</style>
