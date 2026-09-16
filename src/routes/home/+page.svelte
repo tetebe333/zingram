@@ -225,7 +225,7 @@ function openMyProfile() {
 
         {:else}
 
-           <div class="pt-40 px-5">
+           <div class="pt-40 pb-32 px-5">
 
             {#each filteredConversations as conversation}
 
