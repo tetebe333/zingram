@@ -2,7 +2,7 @@
 //svelte-ignore non_reactive_update
 let messageContainer: HTMLDivElement;
 import { 
-ArrowLeft, MessageCircleMore, ChevronDown, Files, Plus, Ban, SquarePen, Camera, Mic , Image , Video, FileText, Send, X, Trash2,Square , Play,} from 'lucide-svelte';
+ArrowLeft, MessageSquareReply, MessageCircleMore, ChevronDown, Files, Plus, Ban, SquarePen, Camera, Mic , Image , Video, FileText, Send, X, Trash2,Square , Play,} from 'lucide-svelte';
 import { page }  from '$app/state' 
 import {onMount, onDestroy, tick}  from 'svelte'
 import { loadConversation, sendMessage, deleteMessage, editMessage, listenAndClearUnread} from '$lib/services/chat'
@@ -2111,13 +2111,29 @@ function closeOtherMessageMenu() {
             onclick={(e) => e.stopPropagation()}
             class="fixed z-50 bottom-10 left-5 w-52 rounded-2xl border border-[#202D46] bg-[#0B1220] text-white shadow-xl"
         >
-            {#if selectedMessage?.text?.trim()}
-                <button
-                    onclick={copyMessageText}
+
+             {#if selectedMessage?.type === "deleted"}
+
+                <div class="px-4 py-4 text-center text-sm text-gray-400 italic">
+                    This message has already been deleted.
+                </div>
+
+            {:else}
+                {#if selectedMessage?.text?.trim()}
+                    <button
+                        onclick={copyMessageText}
+                        class="w-full px-4 py-3 hover:bg-white/5 transition flex items-center gap-2"
+                    >
+                        <Files size="17" />
+                        <span>Copy</span>
+                    </button>
+                {/if}
+
+                 <button
                     class="w-full px-4 py-3 hover:bg-white/5 transition flex items-center gap-2"
                 >
-                    <Files size="17" />
-                    <span>Copy</span>
+                    <MessageSquareReply  size="17" />
+                    <span>Reply</span>
                 </button>
             {/if}
         </div>
