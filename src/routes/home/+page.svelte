@@ -29,6 +29,7 @@ let selectedUserID = $state<string | null>(null);
 let showContextMenu = $state(false);
 let longPressTimer: ReturnType<typeof setTimeout> | undefined;
 let longPressTriggered = false;
+let ignoreNextClick = false;
 let selctedConversationId = $state<string | null>(null);
 let search = $state('')
 
@@ -42,6 +43,7 @@ function startLongPress(
 
     longPressTimer = setTimeout(() => {
         longPressTriggered = true;
+        ignoreNextClick = true;
 
         openContextMenu(
             userId,
@@ -241,14 +243,19 @@ function openMyProfile() {
                 )}
                 {@const unreadCount = conversation.unread?.[$userStore?.uid ?? ''] ?? 0}
                 {#if conversation.lastMessage}
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
                         role="button"
                         tabindex="0"
                         onclick={(e) => {
-                            if (longPressTriggered) {
+                            if (ignoreNextClick || longPressTriggered) {
                                 e.preventDefault();
                                 e.stopPropagation();
+
+                                ignoreNextClick = false;
                                 longPressTriggered = false;
+
                                 return;
                             }
 
@@ -380,8 +387,19 @@ function openMyProfile() {
     {#if showContextMenu && selectedUserID}
          <!-- svelte-ignore a11y_click_events_have_key_events -->
          <!-- svelte-ignore a11y_interactive_supports_focus -->
-        <div role="button" onclick={closeContextMenu}
-        class="fixed inset-0 z-45 w-full h-full bg-black/30 backdrop-blur-sm"></div>   
+        <div
+            role="button"
+            onclick={(e) => {
+                if (ignoreNextClick) {
+                    e.stopPropagation();
+                    ignoreNextClick = false;
+                    return;
+                }
+
+                closeContextMenu();
+            }}
+            class="fixed inset-0 z-45 w-full h-full bg-black/30 backdrop-blur-sm"
+        ></div> 
         <biv role="button"
             class="fixed z-50 bottom-10 left-5 w-52 rounded-2xl border border-[#202D46] bg-[#0B1220] text-white shadow-xl"
         >
