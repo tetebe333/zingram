@@ -2022,8 +2022,8 @@ function cancelLongPress() {
     {#if showMessageMenu}
         <div
             onclick={(e) => e.stopPropagation()}
-            class="fixed z-50 w-42 rounded-2xl border border-[#202D46] bg-[#0B1220] text-white shadow-xl overflow-hidden"
-            style="left:{menuX}px; top:{menuY}px;"
+                        class="fixed z-50 bottom-10 right-5 w-52 rounded-2xl border border-[#202D46] bg-[#0B1220] text-white shadow-xl"
+
         >
 
            {#if selectedMessage?.type === "deleted"}
