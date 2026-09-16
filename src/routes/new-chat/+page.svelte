@@ -82,10 +82,6 @@ function startLongPress(event: TouchEvent, user: UserState) {
         longPressTriggered = true;
         ignoreNextClick = true;
 
-        setTimeout(() => {
-            ignoreNextClick = false;
-        }, 1000);
-
         openContextMenu(user);
     }, 500);
 }
@@ -100,7 +96,17 @@ function cancelLongPress() {
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="relative" onclick={() => showContextMenu = false}>
+<div
+    class="relative"
+    onclick={() => {
+        if (ignoreNextClick) {
+            ignoreNextClick = false;
+            return;
+        }
+
+        showContextMenu = false;
+    }}
+>
     <div class="fixed w-full z-30">
         <div class=" relative flex justify-center items-center  text-white pt-10">
             <div  class="bg-white/10 backdrop-blur-md absolute left-6  top-11 border border-slate-600 rounded-full p-1 hover:bg-slate-700 transition duration-300 ease-in-out">
@@ -182,7 +188,18 @@ function cancelLongPress() {
             {/each}
 
             {#if showContextMenu && selectedUser}
-                  <div class="fixed inset-0 z-45 w-full h-full bg-black/30 backdrop-blur-sm"></div>
+                <div
+                    class="fixed inset-0 z-45 w-full h-full bg-black/30 backdrop-blur-sm"
+                    onclick={(e) => {
+                        if (ignoreNextClick) {
+                            e.stopPropagation();
+                            ignoreNextClick = false;
+                            return;
+                        }
+
+                        showContextMenu = false;
+                    }}
+                ></div>
                 <div
                     class="fixed z-50 bottom-10 left-5 w-52 rounded-2xl border border-[#202D46] bg-[#0B1220] text-white shadow-xl"
                     onclick={(e) => e.stopPropagation()}
