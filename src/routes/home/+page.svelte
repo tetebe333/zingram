@@ -29,17 +29,25 @@ let selectedUserID = $state<string | null>(null);
 let showContextMenu = $state(false);
 let longPressTimer: ReturnType<typeof setTimeout> | undefined;
 let longPressTriggered = false;
+let ignoreNextClick = false;
 let selctedConversationId = $state<string | null>(null);
 let search = $state('')
 
 
-function startLongPress(event: TouchEvent, userId: string, selctedConversationIdP: string ) {
+function startLongPress(
+    event: TouchEvent,
+    userId: string,
+    selctedConversationIdP: string
+) {
     longPressTriggered = false;
 
     longPressTimer = setTimeout(() => {
         longPressTriggered = true;
+        ignoreNextClick = true;
 
-        event.preventDefault();
+        setTimeout(() => {
+            ignoreNextClick = false;
+        }, 1000);
 
         openContextMenu(userId, selctedConversationIdP);
     }, 500);
@@ -179,7 +187,7 @@ function openMyProfile() {
     </div>
 
 {:else}
-    <div class="fixed z-20 w-full">
+    <div class="fixed z-20  w-full">
         <div class="flex justify-between px-7 pt-8">
             <h1 class="text-2xl font-bold text-white"><span class="text-blue-500">C</span>hats</h1>
                 <button onclick={openMyProfile}>
@@ -237,12 +245,15 @@ function openMyProfile() {
                 {@const unreadCount = conversation.unread?.[$userStore?.uid ?? ''] ?? 0}
                 {#if conversation.lastMessage}
                      <button 
-                    onclick={()=>{ 
-                        if (longPressTriggered) {
-                                return;
-                            }
+                    onclick={() => {
+                        if (ignoreNextClick || longPressTriggered) {
+                            ignoreNextClick = false;
+                            longPressTriggered = false;
+                            return;
+                        }
+
                         goto(`/chat/${conversation.id}`);
-                        }}
+                    }}
                     oncontextmenu={(e) => {
                             e.preventDefault();
                             openContextMenu(conversationUser!.uid, conversation.id);

@@ -73,14 +73,18 @@ function openContextMenu(user: UserState){
 
 let longPressTimer: ReturnType<typeof setTimeout> | undefined;
 let longPressTriggered = false;
+let ignoreNextClick = false;
 
 function startLongPress(event: TouchEvent, user: UserState) {
     longPressTriggered = false;
 
     longPressTimer = setTimeout(() => {
         longPressTriggered = true;
+        ignoreNextClick = true;
 
-        event.preventDefault();
+        setTimeout(() => {
+            ignoreNextClick = false;
+        }, 1000);
 
         openContextMenu(user);
     }, 500);
@@ -130,7 +134,9 @@ function cancelLongPress() {
                     role="button"
                     tabindex="0"
                     onclick={() => {
-                        if (longPressTriggered) {
+                        if (ignoreNextClick || longPressTriggered) {
+                            ignoreNextClick = false;
+                            longPressTriggered = false;
                             return;
                         }
 
