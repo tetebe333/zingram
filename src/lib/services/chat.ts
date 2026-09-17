@@ -91,7 +91,15 @@ export async function sendMessage(
     text: string | null,
     type: "text" | "image" | "video" | "audio" | "document" | "deleted" = "text",
     fileUrl: string | null = null,
-    duration: number | null = null
+    duration: number | null = null,
+    replyTo: {
+        messageId: string;
+        senderId: string;
+        type: "text" | "image" | "video" | "audio" | "document" | "deleted";
+        text: string | null;
+        fileUrl: string | null;
+        duration: number | null;
+    } | null = null
 ) {
     const currentUser = await waitForAuth();
 
@@ -134,6 +142,7 @@ export async function sendMessage(
             text,
             fileUrl,
             duration,
+            replyTo,
 
             createdAt: serverTimestamp(),
 

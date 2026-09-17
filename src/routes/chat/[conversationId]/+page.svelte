@@ -8,9 +8,10 @@ import {onMount, onDestroy, tick}  from 'svelte'
 import { loadConversation, sendMessage, deleteMessage, editMessage, listenAndClearUnread} from '$lib/services/chat'
 import { auth } from '$lib/firebase/firebase';
 import { type UserState } from '$lib/stores/user';
-import { loadUsers, usergoto } from '$lib/services/auth';
+import { loadUsers,loadCurrentUser, usergoto } from '$lib/services/auth';
 import { usersStore } from '$lib/stores/users';
 import { loadMessages } from '$lib/services/messages';
+import { userStore } from '$lib/stores/user';
 import { messagesStore, type MessageState } from '$lib/stores/messages';
 import { uploadAudio, uploadImage, uploadVideo, uploadDocument} from '$lib/services/cloudinary';
 import { presenceStore } from '$lib/stores/presence';
@@ -110,6 +111,8 @@ onMount(() => {
 
             // Make sure users are loaded before looking for chatUser.
             await loadUsers();
+
+            await loadCurrentUser();
 
             const conversation =
                 await loadConversation(conversationId);
@@ -246,7 +249,7 @@ let messagePlaybackSpeed = $state(1);
 //recording lets
 let mediaRecorder: MediaRecorder;
 let audioChunks: Blob[] = [];
-let inputMode = $state<'normal' | 'recording' |'preview' | 'editing' >('normal');
+let inputMode = $state<'normal' | 'recording' |'preview' | 'editing' | 'replying' >('normal');
 
 //video lets
 //svelte-ignore non_reactive_update
@@ -321,6 +324,12 @@ let editingMessage = $state<MessageState | null>(null);
 let originalEditingText = $state('');
 let editingMessageText = $state('');
 let discardEdit = $state(false);
+
+//reply messages state
+let replyingTo = $state<MessageState | null>(null);
+let touchStartX = $state(0);
+let touchStartY = $state(0);
+
 // Automatically grow the textarea to fit long text up to a maximum height
   function autoGrow() {
     if (!textareaRef) return;
@@ -332,16 +341,32 @@ let discardEdit = $state(false);
     textareaRef.style.height = `${newHeight}px`;
   }
 
-  async function resetTextarea() {
+  function getReplyToData() {
+    if (!replyingTo) return null;
+
+    return {
+        messageId: replyingTo.id,
+        senderId: replyingTo.senderId,
+        type: replyingTo.type,
+        text: replyingTo.text,
+        fileUrl: replyingTo.fileUrl,
+        duration: replyingTo.duration
+    };
+}
+
+ async function resetTextarea() {
     messageText = '';
 
+    replyingTo = null;
+    inputMode = 'normal';
+
     await tick();
-    
 
     if (textareaRef) {
-        textareaRef.style.height = '24px'; // your normal one-line height
+        textareaRef.style.height = '24px';
     }
 }
+
   async function handleSendMessage() {
     sendingMessage = true;
     scrollToBottom()
@@ -361,7 +386,9 @@ let discardEdit = $state(false);
                     conversationId,
                     messageText.trim() || null,
                     'image',
-                    fileUrl
+                    fileUrl,
+                    null,
+                    getReplyToData()
                 );
 
                 // Clear image preview
@@ -404,7 +431,9 @@ let discardEdit = $state(false);
                     conversationId,
                     messageText.trim() || null,
                     "video",
-                    fileUrl
+                    fileUrl,
+                    null,
+                    getReplyToData()
                 );
                 // Clear preview
                 if (videoPreviewUrl) {
@@ -445,7 +474,9 @@ let discardEdit = $state(false);
                     conversationId,
                     messageText.trim() || null,
                     "document",
-                    fileUrl
+                    fileUrl,
+                    null,
+                    getReplyToData()
                 );
                 // Clear document preview
                 selectedDocument = null;
@@ -479,7 +510,11 @@ let discardEdit = $state(false);
         
         await sendMessage(
             conversationId,
-            messageText
+            messageText,
+            'text',
+            null,
+            null,
+            getReplyToData()
         );
 
         await tick()
@@ -645,7 +680,8 @@ async function sendRecording() {
             null,
             'audio',
             fileUrl,
-            recordedDuration
+            recordedDuration,
+            getReplyToData()
         );
 
         await tick()
@@ -653,6 +689,10 @@ async function sendRecording() {
         //clear the local recording
         audioBlob = null;
         audioChunks = [];
+
+        //clear reply
+        replyingTo = null;
+        inputMode = 'normal';
 
         //reset preview
         recordingSecond = 0;
@@ -1179,6 +1219,65 @@ function closeOtherMessageMenu() {
 	selectedMessage = null;
 }
 
+function startReply(message: MessageState) {
+	replyingTo = message;
+	inputMode = "replying";
+
+	closeMessageMenu();
+	closeOtherMessageMenu();
+}
+
+function jumpToOriginalMessage(messageId: string) {
+    const originalMessage = document.getElementById(
+        `message-${messageId}`
+    );
+
+    if (!originalMessage) return;
+
+    originalMessage.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+    });
+
+    originalMessage.classList.add('reply-highlight');
+
+    setTimeout(() => {
+        originalMessage.classList.remove('reply-highlight');
+    }, 2500);
+}
+
+function startSwipe(event: TouchEvent) {
+    const touch = event.touches[0];
+
+    if (!touch) return;
+
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+}
+
+function handleSwipe(
+    event: TouchEvent,
+    message: MessageState
+) {
+    const touch = event.changedTouches[0];
+
+    if (!touch) return;
+
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = touch.clientY - touchStartY;
+
+    // Ignore vertical movement
+    if (Math.abs(deltaY) > Math.abs(deltaX)) return;
+
+    // Must swipe far enough
+    if (Math.abs(deltaX) < 70) return;
+
+    // Swipe right → Reply
+    if (deltaX > 70) {
+        startReply(message);
+    }
+}
+
 
 </script>
 
@@ -1288,13 +1387,49 @@ function closeOtherMessageMenu() {
                 <div class="flex justify-end mb-3 w-full min-w-0">
 
                     <div
-                        ontouchstart={(e) => startLongPress(e, message)}
-                        ontouchend={cancelLongPress}
+                        id={`message-${message.id}`}
+                        ontouchstart={(e) => {
+                            startLongPress(e, message);
+                            startSwipe(e);
+                        }}
+                        ontouchend={(e) => {
+                            cancelLongPress();
+                            handleSwipe(e, message);
+                        }}
                         ontouchcancel={cancelLongPress}
                         ontouchmove={cancelLongPress}
                         oncontextmenu={(e) => openMessageMenu(e, message)}
                         class="bg-blue-700 px-4 py-2 text-white rounded-2xl w-fit max-w-[85%] min-w-0 rounded-br-none"
                     >
+
+                        {#if message.replyTo}
+                            <div
+                                onclick={() => jumpToOriginalMessage(message.replyTo!.messageId)}
+                                class="mb-2 px-3 py-2 rounded-xl bg-blue-900/40 border-l-2 border-blue-300 cursor-pointer"
+                            >
+                                <p class="text-blue-500 text-xs font-medium">
+                                   Replyied to {message.replyTo?.senderId === auth.currentUser?.uid
+                                        ? $userStore?.fullName ?? 'yourself'
+                                        : chatUser?.fullName ?? 'user'}
+                                </p>
+
+                                <p class="text-gray-300 text-sm truncate">
+                                    {#if message.replyTo?.text}
+                                        {message.replyTo.text}
+                                    {:else if message.replyTo?.type === 'image'}
+                                        Photo
+                                    {:else if message.replyTo?.type === 'video'}
+                                        Video
+                                    {:else if message.replyTo?.type === 'audio'}
+                                        Audio
+                                    {:else if message.replyTo?.type === 'document'}
+                                        Document
+                                    {:else if message.replyTo?.type === 'deleted'}
+                                        This message was deleted
+                                    {/if}
+                                </p>
+                            </div>
+                        {/if}
 
                         {#if message.type === 'deleted'}
 
@@ -1473,13 +1608,49 @@ function closeOtherMessageMenu() {
                 <div class="flex justify-start mb-3 w-full min-w-0">
 
                     <div
-                        ontouchstart={(e) => startOtherLongPress(e, message)}
-                        ontouchend={cancelLongPress}
+                        id={`message-${message.id}`}
+                        ontouchstart={(e) => {
+                            startOtherLongPress(e, message);
+                            startSwipe(e);
+                        }}
+                        ontouchend={(e) => {
+                            cancelLongPress();
+                            handleSwipe(e, message);
+                        }}
                         ontouchcancel={cancelLongPress}
                         ontouchmove={cancelLongPress}
                         oncontextmenu={(e) => openOtherMessageMenu(e, message)}
                         class="bg-[#1F2937] text-white px-4 py-2 rounded-2xl w-fit max-w-[85%] min-w-0 rounded-bl-none"
                     >
+
+                         {#if message.replyTo}
+                            <div
+                                onclick={() => jumpToOriginalMessage(message.replyTo!.messageId)}
+                                class="mb-2 px-3 py-2 rounded-xl bg-blue-900/40 border-l-2 border-blue-300 cursor-pointer"
+                            >     
+                                 <p class="text-blue-500 text-xs font-medium">
+                                   Replyied to {message.replyTo?.senderId === auth.currentUser?.uid
+                                        ? $userStore?.fullName ?? 'yourself'
+                                        : chatUser?.fullName ?? 'user'}
+                                </p>
+
+                                <p class="text-gray-300 text-sm truncate">
+                                    {#if message.replyTo?.text}
+                                        {message.replyTo.text}
+                                    {:else if message.replyTo?.type === 'image'}
+                                        Photo
+                                    {:else if message.replyTo?.type === 'video'}
+                                        Video
+                                    {:else if message.replyTo?.type === 'audio'}
+                                        Audio
+                                    {:else if message.replyTo?.type === 'document'}
+                                        Document
+                                    {:else if message.replyTo?.type === 'deleted'}
+                                        This message was deleted
+                                    {/if}
+                                </p>
+                            </div>
+                        {/if}
 
 
                          {#if message.type === 'deleted'}
@@ -1881,7 +2052,86 @@ function closeOtherMessageMenu() {
             </div>
 
         </div>
-        
+    
+    {:else if inputMode === 'replying'}
+
+    <div onclick={(e:any) => e.stopPropagation()}
+        class="fixed w-full bottom-10 z-50 left-0">
+
+        <!-- Reply preview -->
+        <div class="flex justify-end mx-5 mb-2">
+            <div class="bg-slate-900/90 border border-white/10 px-4 py-2 text-white rounded-2xl w-fit max-w-[85%] min-w-0 rounded-br-none">
+
+                <div class="flex items-center justify-between gap-4 mb-1">
+                    <p class="text-blue-500 text-xs font-medium">
+                        Replying to message
+                    </p>
+
+                    <button onclick={() => {
+                        replyingTo = null;
+                        inputMode = 'normal';
+                    }}>
+                        <X size="15" />
+                    </button>
+                </div>
+
+                <p class="first-letter:uppercase text-gray-300 text-sm truncate">
+                    {replyingTo?.text ?? replyingTo?.type+' Message'}
+                </p>
+
+            </div>
+        </div>
+
+        <!-- Reply input -->
+        <div class="flex items-end justify-between bg-slate-900/60 border border-white/10 backdrop-blur-xl mx-5 py-3 px-3 rounded-2xl gap-2">
+
+            <!-- Cancel reply -->
+            <button
+                onclick={() => {
+                    replyingTo = null;
+                    inputMode = 'normal';
+                }}
+                class="w-8 h-8 flex items-center justify-center border-2 border-blue-600 text-blue-500 rounded-full shrink-0 mb-05"
+            >
+                <X size="20"/>
+            </button>
+
+            <!-- Textarea -->
+            <textarea
+                bind:this={textareaRef}
+                bind:value={messageText}
+                oninput={() => {
+                    autoGrow();
+                    handleTyping();
+                }}
+                rows="1"
+                placeholder="Type a message..."
+                class="w-full bg-transparent text-gray-200 outline-none resize-none px-2 py-1 max-h-40 text-base overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] scrollbar-none"
+            ></textarea>
+
+            <!-- Send -->
+            <div class="flex items-center gap-1 shrink-0 mb-0.5">
+
+                <button
+                    onclick={handleSendMessage}
+                    class="text-white bg-blue-700 px-2 py-1 rounded-lg"
+                >
+                    {#if sendingMessage}
+                        <div class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
+                        Sending...
+                    {:else}
+                        <Send class="inline" size="18"/>
+                        send
+                    {/if}
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
     {:else if inputMode === 'editing'}
       <div onclick={(e:any) => e.stopPropagation()} 
       class="fixed  w-full bottom-10 z-50 left-0">
@@ -2077,6 +2327,14 @@ function closeOtherMessageMenu() {
                     </button>
                 {/if}
 
+                <button
+                    onclick={() => startReply(selectedMessage!)}
+                    class="w-full px-4 py-3 hover:bg-white/5 transition flex items-center gap-2"
+                >
+                    <MessageSquareReply size="17" />
+                    <span>Reply</span>
+                </button>
+
                 {#if canEditMessage(selectedMessage!) && selectedMessage?.text !== null}
                     <button
                         onclick={() => startEditMessage(selectedMessage!)}
@@ -2130,6 +2388,7 @@ function closeOtherMessageMenu() {
                 {/if}
 
                  <button
+                    onclick={() => startReply(selectedMessage!)}
                     class="w-full px-4 py-3 hover:bg-white/5 transition flex items-center gap-2"
                 >
                     <MessageSquareReply  size="17" />
@@ -2197,8 +2456,25 @@ function closeOtherMessageMenu() {
 </div>
 
 
+<style>
+    :global(.reply-highlight) {
+        animation: replyHighlight 2.5s ease;
+    }
 
+    @keyframes replyHighlight {
+        0%,
+        100% {
+            box-shadow: 0 0 0 0 transparent;
+            filter: brightness(1);
+        }
 
+        25%,
+        75% {
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9);
+            filter: brightness(1.25);
+        }
+    }
+</style>
 
 
 
