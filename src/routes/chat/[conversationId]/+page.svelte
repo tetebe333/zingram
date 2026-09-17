@@ -2,7 +2,7 @@
 //svelte-ignore non_reactive_update
 let messageContainer: HTMLDivElement;
 import { 
-ArrowLeft, MessageSquareReply, MessageCircleMore, ChevronDown, Files, Plus, Ban, SquarePen, Camera, Mic , Image , Video, FileText, Send, X, Trash2,Square , Play,} from 'lucide-svelte';
+ArrowLeft, Headphones, MessageSquareReply, FileImage, MessageCircleMore, ChevronDown, Files, Plus, Ban, SquarePen, Camera, Mic , Image , Video, FileText, Send, X, Trash2,Square , Play,} from 'lucide-svelte';
 import { page }  from '$app/state' 
 import {onMount, onDestroy, tick}  from 'svelte'
 import { loadConversation, sendMessage, deleteMessage, editMessage, listenAndClearUnread} from '$lib/services/chat'
@@ -1263,6 +1263,9 @@ function handleSwipe(
 
     if (!touch) return;
 
+    // Don't allow replying to deleted messages
+    if (message.type === 'deleted') return;
+
     const deltaX = touch.clientX - touchStartX;
     const deltaY = touch.clientY - touchStartY;
 
@@ -1413,16 +1416,20 @@ function handleSwipe(
                                         : chatUser?.fullName ?? 'user'}
                                 </p>
 
-                                <p class="text-gray-300 text-sm truncate">
+                                <p class="text-gray-300 text-sm truncate flex justify-start items-center gap-1">
                                     {#if message.replyTo?.text}
                                         {message.replyTo.text}
                                     {:else if message.replyTo?.type === 'image'}
+                                        <FileImage size="16"/>
                                         Photo
                                     {:else if message.replyTo?.type === 'video'}
+                                        <Video class="mt-0.5"  size="20"/>
                                         Video
                                     {:else if message.replyTo?.type === 'audio'}
+                                        <Headphones  class="ms-1"  size="17"/>
                                         Audio
                                     {:else if message.replyTo?.type === 'document'}
+                                        <FileText   class="ms-1"  size="17"/>
                                         Document
                                     {:else if message.replyTo?.type === 'deleted'}
                                         This message was deleted
@@ -1634,16 +1641,20 @@ function handleSwipe(
                                         : chatUser?.fullName ?? 'user'}
                                 </p>
 
-                                <p class="text-gray-300 text-sm truncate">
+                                <p class="text-gray-300 text-sm truncate flex justify-start items-center gap-1">
                                     {#if message.replyTo?.text}
                                         {message.replyTo.text}
                                     {:else if message.replyTo?.type === 'image'}
+                                        <FileImage size="16"/>
                                         Photo
                                     {:else if message.replyTo?.type === 'video'}
+                                        <Video class="mt-0.5"  size="20"/>
                                         Video
                                     {:else if message.replyTo?.type === 'audio'}
+                                        <Headphones  class="ms-1"  size="17"/>
                                         Audio
                                     {:else if message.replyTo?.type === 'document'}
+                                        <FileText   class="ms-1"  size="17"/>
                                         Document
                                     {:else if message.replyTo?.type === 'deleted'}
                                         This message was deleted
@@ -2075,8 +2086,24 @@ function handleSwipe(
                     </button>
                 </div>
 
-                <p class="first-letter:uppercase text-gray-300 text-sm truncate">
-                    {replyingTo?.text ?? replyingTo?.type+' Message'}
+                <p class="first-letter:uppercase text-gray-300 text-sm truncate flex justify-start items-baseline-last gap-1">
+                    {#if replyingTo?.text}
+                        {replyingTo.text}
+                    {:else if replyingTo?.type === 'image'}
+                        <FileImage size="16"/>
+                        Photo
+                    {:else if replyingTo?.type === 'video'}
+                        <Video size="20"/>
+                        Video
+                    {:else if replyingTo?.type === 'audio'}
+                        <Headphones size="17"/>
+                        Audio
+                    {:else if replyingTo?.type === 'document'}
+                        <FileText size="17"/>
+                        Document
+                    {:else if replyingTo?.type === 'deleted'}
+                        This message was deleted
+                    {/if}
                 </p>
 
             </div>
@@ -2110,10 +2137,31 @@ function handleSwipe(
             ></textarea>
 
             <!-- Send -->
+            <!-- Right Action Group -->
             <div class="flex items-center gap-1 shrink-0 mb-0.5">
 
+                <!-- Camera -->
+                <button
+                    onclick={openCamera}
+                    class:hidden={hasSomethingToSend}
+                    class="text-blue-500 p-1 rounded-full hover:bg-white/5 transition"
+                >
+                    <Camera size="22"/>
+                </button>
+
+                <!-- Mic -->
+                <button
+                    onclick={startRecording}
+                    class:hidden={hasSomethingToSend}
+                    class="text-blue-500 p-1 rounded-full hover:bg-white/5 transition"
+                >
+                    <Mic size="22"/>
+                </button>
+
+                <!-- Send -->
                 <button
                     onclick={handleSendMessage}
+                    class:hidden={!hasSomethingToSend}
                     class="text-white bg-blue-700 px-2 py-1 rounded-lg"
                 >
                     {#if sendingMessage}
