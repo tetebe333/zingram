@@ -15,6 +15,7 @@ import { ConversationsStore } from '$lib/stores/conversation';
 import { loadCurrentUser, loadUsers, checkAndUpdateEmail, usergoto} from '$lib/services/auth';
 import { loadConversations} from '$lib/services/chat';
 import { loadMessages } from '$lib/services/messages';
+import { messagesStore } from '$lib/stores/messages';
 import { loadUsersPresence } from "$lib/services/presence";
 import { presenceMapStore } from '$lib/stores/presenceUsers';
 import { formatLastSeen, formatLastTime} from '$lib/utils/lastSeen';
@@ -172,6 +173,103 @@ function openMyProfile() {
     goto(`/myProfile/${$userStore.uid}`);
 }
 
+function getConversationPreview(conversationId: string) {
+    const conversationMessages =
+        $messagesStore[conversationId] ?? [];
+
+    const lastMessage =
+        conversationMessages[conversationMessages.length - 1];
+
+    if (!lastMessage) {
+        return null;
+    }
+
+    // Don't show reactions for deleted messages
+    if (
+        lastMessage.type === 'deleted' ||
+        !lastMessage.reactions
+    ) {
+        return null;
+    }
+
+    const emojis = [
+        "👍",
+        "😂",
+        "❤️",
+        "😭",
+        "🤬"
+    ] as const;
+
+    let reactionEmoji:
+        | "👍"
+        | "😂"
+        | "❤️"
+        | "😭"
+        | "🤬"
+        | null = null;
+
+    let totalReactions = 0;
+
+    for (const emoji of emojis) {
+        const users =
+            lastMessage.reactions[emoji] ?? [];
+
+        totalReactions += users.length;
+
+        if (
+            !reactionEmoji &&
+            users.length > 0
+        ) {
+            reactionEmoji = emoji;
+        }
+    }
+
+    if (!reactionEmoji || totalReactions === 0) {
+        return null;
+    }
+
+    const currentUid = $userStore?.uid;
+
+    const iReacted =
+        currentUid &&
+        lastMessage.reactions[reactionEmoji]?.includes(
+            currentUid
+        );
+
+    let messagePreview = '';
+
+    if (lastMessage.text) {
+        messagePreview = lastMessage.text;
+    } else {
+        switch (lastMessage.type) {
+            case 'image':
+                messagePreview = 'Photo';
+                break;
+
+            case 'video':
+                messagePreview = 'Video';
+                break;
+
+            case 'audio':
+                messagePreview = 'Audio';
+                break;
+
+            case 'document':
+                messagePreview = 'Document';
+                break;
+
+            default:
+                messagePreview = 'Message';
+        }
+    }
+
+    if (iReacted) {
+        return `You reacted ${reactionEmoji} to “${messagePreview}”`;
+    }
+
+    return `Reacted ${reactionEmoji} to “${messagePreview}”`;
+}
+
 
 </script>
 
@@ -241,6 +339,7 @@ function openMyProfile() {
                         conversation.participants.includes(user.uid) &&
                         user.uid !== $userStore?.uid
                 )}
+                {@const reactionPreview = getConversationPreview(conversation.id)}
                 {@const unreadCount = conversation.unread?.[$userStore?.uid ?? ''] ?? 0}
                 {#if conversation.lastMessage}
                     <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -302,7 +401,7 @@ function openMyProfile() {
                                 {/if}
 
                                 <p class="text-xs text-gray-500 truncate w-full">
-                                    {conversation.lastMessage ?? 'No message'}
+                                    {reactionPreview ?? conversation.lastMessage ?? 'No message'}
                                 </p>
 
                             </div>

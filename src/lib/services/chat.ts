@@ -289,6 +289,9 @@ export async function reactToMessage(
 
     const message = messageSnap.data();
 
+    const messageSenderId = message.senderId;
+    const messageType = message.type;
+
     const reactions = message.reactions ?? {};
 
     const userId = currentUser.uid;
@@ -327,6 +330,74 @@ export async function reactToMessage(
         arrayUnion(userId);
 
     await updateDoc(messageRef, updates);
+
+    let reactionMessage = '';
+
+    if (message.text) {
+        reactionMessage = `Reacted ${emoji} to “${message.text}”`;
+    } else {
+        let messagePreview = 'Message';
+
+        switch (messageType) {
+            case 'image':
+                messagePreview = 'Photo';
+                break;
+
+            case 'video':
+                messagePreview = 'Video';
+                break;
+
+            case 'audio':
+                messagePreview = 'Audio';
+                break;
+
+            case 'document':
+                messagePreview = 'Document';
+                break;
+        }
+
+        reactionMessage = `Reacted ${emoji} to “${messagePreview}”`;
+
+        if (messageSenderId !== userId) {
+            void fetch("/api/notifications/send", {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    recipientId: messageSenderId,
+                    senderId: userId,
+                    conversationId: message.conversationId,
+                    messageText: reactionMessage
+                })
+            })
+                .then(async (response) => {
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        console.error(
+                            "Reaction notification endpoint failed:",
+                            result
+                        );
+
+                        return;
+                    }
+
+                    console.log(
+                        "Reaction notification sent in background:",
+                        result
+                    );
+                })
+                .catch((error) => {
+                    console.error(
+                        "Background reaction notification request failed:",
+                        error
+                    );
+            });
+        }
+    }
 }
 
 
