@@ -1,5 +1,5 @@
 import { db,  auth } from '$lib/firebase/firebase';
-import { doc,  orderBy, getDoc, onSnapshot, collection, addDoc, updateDoc, serverTimestamp, deleteField, where, query, getDocs } from 'firebase/firestore';
+import { doc, orderBy, getDoc, onSnapshot, collection, addDoc, updateDoc, serverTimestamp, deleteField, where, query, getDocs, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { ConversationStore, ConversationsStore, type ConversationState, conversationsLoadedStore } from '$lib/stores/conversation';
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { loadUsers } from './auth';
@@ -267,6 +267,66 @@ export async function deleteMessage(messageId: string) {
 
     });
 
+}
+
+export async function reactToMessage(
+    messageId: string,
+    emoji: "👍" | "😂" | "❤️" | "😭" | "🤬"
+) {
+    const currentUser = await waitForAuth();
+
+    if (!currentUser) {
+        throw new Error("No authenticated user");
+    }
+
+    const messageRef = doc(db, "messages", messageId);
+
+    const messageSnap = await getDoc(messageRef);
+
+    if (!messageSnap.exists()) {
+        throw new Error("Message not found");
+    }
+
+    const message = messageSnap.data();
+
+    const reactions = message.reactions ?? {};
+
+    const userId = currentUser.uid;
+
+    const currentReactions = [
+        "👍",
+        "😂",
+        "❤️",
+        "😭",
+        "🤬"
+    ] as const;
+
+    // If the user taps the reaction they already have → REMOVE
+    if (reactions[emoji]?.includes(userId)) {
+
+        await updateDoc(messageRef, {
+            [`reactions.${emoji}`]: arrayRemove(userId)
+        });
+
+        return;
+    }
+
+    // Remove user's old reaction from every other emoji
+    const updates: Record<string, any> = {};
+
+    for (const reaction of currentReactions) {
+
+        if (reaction !== emoji) {
+            updates[`reactions.${reaction}`] =
+                arrayRemove(userId);
+        }
+    }
+
+    // Add the new reaction
+    updates[`reactions.${emoji}`] =
+        arrayUnion(userId);
+
+    await updateDoc(messageRef, updates);
 }
 
 

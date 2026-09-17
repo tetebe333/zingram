@@ -2,10 +2,10 @@
 //svelte-ignore non_reactive_update
 let messageContainer: HTMLDivElement;
 import { 
-ArrowLeft, Headphones, MessageSquareReply, FileImage, MessageCircleMore, ChevronDown, Files, Plus, Ban, SquarePen, Camera, Mic , Image , Video, FileText, Send, X, Trash2,Square , Play,} from 'lucide-svelte';
+ArrowLeft, SmilePlus, Headphones, MessageSquareReply, FileImage, MessageCircleMore, ChevronDown, Files, Plus, Ban, SquarePen, Camera, Mic , Image , Video, FileText, Send, X, Trash2,Square , Play,} from 'lucide-svelte';
 import { page }  from '$app/state' 
 import {onMount, onDestroy, tick}  from 'svelte'
-import { loadConversation, sendMessage, deleteMessage, editMessage, listenAndClearUnread} from '$lib/services/chat'
+import { loadConversation, reactToMessage, sendMessage, deleteMessage, editMessage, listenAndClearUnread} from '$lib/services/chat'
 import { auth } from '$lib/firebase/firebase';
 import { type UserState } from '$lib/stores/user';
 import { loadUsers,loadCurrentUser, usergoto } from '$lib/services/auth';
@@ -329,6 +329,10 @@ let discardEdit = $state(false);
 let replyingTo = $state<MessageState | null>(null);
 let touchStartX = $state(0);
 let touchStartY = $state(0);
+
+//reaction state
+let selectedReactionMessage = $state<MessageState | null>(null);
+let showReactionPicker = $state(false);
 
 // Automatically grow the textarea to fit long text up to a maximum height
   function autoGrow() {
@@ -1281,6 +1285,109 @@ function handleSwipe(
     }
 }
 
+function getReactionEmojis(
+    reactions: MessageState["reactions"]
+) {
+    if (!reactions) return [];
+
+    return (["👍", "😂", "❤️", "😭", "🤬"] as const)
+        .filter((emoji) => reactions[emoji]?.length > 0);
+}
+
+function getReactionCount(
+    reactions: MessageState["reactions"]
+) {
+    if (!reactions) return 0;
+
+    return (
+        reactions["👍"]?.length ?? 0
+    ) +
+        (reactions["😂"]?.length ?? 0) +
+        (reactions["❤️"]?.length ?? 0) +
+        (reactions["😭"]?.length ?? 0) +
+        (reactions["🤬"]?.length ?? 0);
+}
+
+function openReactionDetails(message: MessageState) {
+    if (message.type === 'deleted') return;
+
+    selectedReactionMessage = message;
+}
+
+function getReactionCountForEmoji(
+    reactions: MessageState["reactions"],
+    emoji: "👍" | "😂" | "❤️" | "😭" | "🤬"
+) {
+    return reactions?.[emoji]?.length ?? 0;
+}
+
+async function handleReactionSelect(
+    emoji: "👍" | "😂" | "❤️" | "😭" | "🤬"
+) {
+    if (!selectedReactionMessage) return;
+
+    await reactToMessage(
+        selectedReactionMessage.id,
+        emoji
+    );
+
+    showReactionPicker = false;
+}
+
+function getReactionUsers(
+    reactions: MessageState["reactions"]
+) {
+    if (!reactions) return [];
+
+    const users: {
+        uid: string;
+        emoji: "👍" | "😂" | "❤️" | "😭" | "🤬";
+    }[] = [];
+
+    const emojis = [
+        "👍",
+        "😂",
+        "❤️",
+        "😭",
+        "🤬"
+    ] as const;
+
+    for (const emoji of emojis) {
+        for (const uid of reactions[emoji] ?? []) {
+            users.push({
+                uid,
+                emoji
+            });
+        }
+    }
+
+    return users;
+}
+
+function getMyReaction(
+    reactions: MessageState["reactions"]
+) {
+    const uid = auth.currentUser?.uid;
+
+    if (!uid || !reactions) return null;
+
+    const emojis = [
+        "👍",
+        "😂",
+        "❤️",
+        "😭",
+        "🤬"
+    ] as const;
+
+    for (const emoji of emojis) {
+        if (reactions[emoji]?.includes(uid)) {
+            return emoji;
+        }
+    }
+
+    return null;
+}
+
 
 </script>
 
@@ -1387,7 +1494,7 @@ function handleSwipe(
             {#if message.senderId === auth.currentUser?.uid}
 
                 <!-- MY MESSAGE -->
-                <div class="flex justify-end mb-3 w-full min-w-0">
+                <div class="flex flex-col items-end mb-3 w-full min-w-0">
 
                     <div
                         id={`message-${message.id}`}
@@ -1405,7 +1512,7 @@ function handleSwipe(
                         class="bg-blue-700 px-4 py-2 text-white rounded-2xl w-fit max-w-[85%] min-w-0 rounded-br-none"
                     >
 
-                        {#if message.replyTo}
+                        {#if message.replyTo && message.type !== 'deleted'}
                             <div
                                 onclick={() => jumpToOriginalMessage(message.replyTo!.messageId)}
                                 class="mb-2 px-3 py-2 rounded-xl bg-blue-900/40 border-l-2 border-blue-300 cursor-pointer"
@@ -1607,12 +1714,28 @@ function handleSwipe(
                         
                     </div>
 
+                    {#if message.reactions && getReactionCount(message.reactions) > 0 && message.type !== 'deleted'}
+                        <button
+                            onclick={() => openReactionDetails(message)}
+                            class="mt-1 px-2 py-1 rounded-full bg-[#1F2937] border border-white/10 flex items-center gap-1 text-sm"
+                        >
+                            {#each getReactionEmojis(message.reactions) as emoji}
+                                <span>{emoji}</span>
+                            {/each}
+
+                            <span class="text-gray-300 text-xs">
+                                {getReactionCount(message.reactions)}
+                            </span>
+                        </button>
+                    {/if}
+
+
                 </div>
 
             {:else}
 
                 <!-- THEIR MESSAGE -->
-                <div class="flex justify-start mb-3 w-full min-w-0">
+                <div class="flex flex-col items-start mb-3 w-full min-w-0">
 
                     <div
                         id={`message-${message.id}`}
@@ -1630,7 +1753,7 @@ function handleSwipe(
                         class="bg-[#1F2937] text-white px-4 py-2 rounded-2xl w-fit max-w-[85%] min-w-0 rounded-bl-none"
                     >
 
-                         {#if message.replyTo}
+                         {#if message.replyTo && message.type !== 'deleted'}
                             <div
                                 onclick={() => jumpToOriginalMessage(message.replyTo!.messageId)}
                                 class="mb-2 px-3 py-2 rounded-xl bg-blue-900/40 border-l-2 border-blue-300 cursor-pointer"
@@ -1824,6 +1947,21 @@ function handleSwipe(
                         </div>
 
                     </div>
+
+                    {#if message.reactions && getReactionCount(message.reactions) > 0 && message.type !== 'deleted'}
+                        <button
+                            onclick={() => openReactionDetails(message)}
+                            class="mt-1 px-2 py-1 rounded-full bg-[#1F2937] border border-white/10 flex items-center gap-1 text-sm"
+                        >
+                            {#each getReactionEmojis(message.reactions) as emoji}
+                                <span>{emoji}</span>
+                            {/each}
+
+                            <span class="text-gray-300 text-xs">
+                                {getReactionCount(message.reactions)}
+                            </span>
+                        </button>
+                    {/if}
 
                 </div>
 
@@ -2365,6 +2503,58 @@ function handleSwipe(
 
             {:else}
 
+                    <div class="flex items-center gap-2 px-3 py-2 border-t border-white/10">
+                        <button
+                            onclick={async (e) => {
+                                await reactToMessage(selectedMessage!.id, "👍");
+                                closeMessageMenu();
+                            }}
+                            class="text-xl hover:scale-110 transition"
+                        >
+                            👍
+                        </button>
+
+                        <button
+                            onclick={async () => {
+                                await reactToMessage(selectedMessage!.id, "😂");
+                                closeMessageMenu();
+                            }}
+                            class="text-xl hover:scale-110 transition"
+                        >
+                            😂
+                        </button>
+
+                        <button
+                            onclick={async () => {
+                                await reactToMessage(selectedMessage!.id, "❤️");
+                                closeMessageMenu();
+                            }}
+                            class="text-xl hover:scale-110 transition"
+                        >
+                            ❤️
+                        </button>
+
+                        <button
+                            onclick={async () => {
+                                await reactToMessage(selectedMessage!.id, "😭");
+                                closeMessageMenu();
+                            }}
+                            class="text-xl hover:scale-110 transition"
+                        >
+                            😭
+                        </button>
+
+                        <button
+                            onclick={async () => {
+                                await reactToMessage(selectedMessage!.id, "🤬");
+                                closeMessageMenu();
+                            }}
+                            class="text-xl hover:scale-110 transition"
+                        >
+                            🤬
+                        </button>
+                    </div>
+
                 {#if selectedMessage?.text}
                     <button
                         onclick={copyMessageText}
@@ -2425,6 +2615,61 @@ function handleSwipe(
                 </div>
 
             {:else}
+
+                <div class="flex items-center gap-2 px-3 py-2 border-t border-white/10">
+                        <button
+                            onclick={async () => {
+                                await reactToMessage(selectedMessage!.id, "👍");
+                                closeOtherMessageMenu();
+                            }}
+                            class="text-xl hover:scale-110 transition"
+                        >
+                            👍
+                        </button>
+
+                        <button
+                            onclick={async () => {
+                                await reactToMessage(selectedMessage!.id, "😂");
+                                closeOtherMessageMenu();
+                            }}
+                            class="text-xl hover:scale-110 transition"
+                        >
+                            😂
+                        </button>
+
+                        <button
+                            onclick={async () => {
+                                await reactToMessage(selectedMessage!.id, "❤️");
+                                closeOtherMessageMenu();
+                            }}
+                            class="text-xl hover:scale-110 transition"
+                        >
+                            ❤️
+                        </button>
+
+                        <button
+                            onclick={async () => {
+                                await reactToMessage(selectedMessage!.id, "😭");
+                                closeOtherMessageMenu();
+                            }}
+                            class="text-xl hover:scale-110 transition"
+                        >
+                            😭
+                        </button>
+
+                        <button
+                            onclick={async () => {
+                                await reactToMessage(selectedMessage!.id, "🤬");
+                                closeOtherMessageMenu();
+                            }}
+                            class="text-xl hover:scale-110 transition"
+                        >
+                            🤬
+                        </button>
+                    </div>
+
+
+  
                 {#if selectedMessage?.text?.trim()}
                     <button
                         onclick={copyMessageText}
@@ -2499,6 +2744,311 @@ function handleSwipe(
 
         </div>
     {/if}
+
+    //reaction detaise
+    {#if selectedReactionMessage}
+        <div class="fixed inset-0 z-50">
+
+            <!-- Dark background -->
+            <div
+                class="absolute inset-0 bg-black/65"
+                onclick={() => {
+                    selectedReactionMessage = null;
+                }}
+            ></div>
+
+
+            <!-- Bottom sheet -->
+            <div
+                class="absolute bottom-0 left-0 right-0
+                    w-full
+                    min-h-[45vh]
+                    max-h-[80vh]
+                    bg-[#111111]
+                    rounded-t-[28px]
+                    text-white
+                    overflow-hidden
+                    animate-reaction-sheet"
+                onclick={(event) => event.stopPropagation()}
+            >
+
+                <!-- Drag handle -->
+                <div class="flex justify-center pt-3 pb-2">
+                    <div
+                        class="w-12 h-1.5 rounded-full bg-gray-500/70"
+                    ></div>
+                </div>
+
+
+                <!-- Title -->
+                <div class="px-6 pt-2 pb-5">
+                    <h2 class="text-center text-2xl font-bold">
+                        {getReactionCount(
+                            selectedReactionMessage.reactions
+                        )} Reactions
+                    </h2>
+                </div>
+
+               <div class="px-6 pb-5">
+
+                    <div class="flex items-center justify-between gap-2">
+
+                            <!-- ADD REACTION BUTTON -->
+                            <button
+                                onclick={() => {
+                                    showReactionPicker = !showReactionPicker;
+                                }}
+                                class="w-16 h-12 shrink-0 rounded-full
+                                    bg-[#1F1F1F]
+                                    border border-white/10
+                                    flex items-center justify-center
+                                    text-gray-300
+                                    hover:bg-[#292929]
+                                    transition"
+                            >
+                                <SmilePlus size="25" />
+                            </button>
+
+
+                            <!-- REACTION PICKER -->
+                            {#if showReactionPicker}
+
+                                {#each ["👍", "😂", "❤️", "😭", "🤬"] as emoji}
+
+                                    <button
+                                        onclick={() =>
+                                            handleReactionSelect(
+                                                emoji as "👍" | "😂" | "❤️" | "😭" | "🤬"
+                                            )
+                                        }
+                                        class={`flex-1 h-12 min-w-0 rounded-full border
+                                            flex items-center justify-center gap-1 text-lg transition
+                                            ${
+                                                getMyReaction(
+                                                    currentMessages.find(
+                                                        (message) =>
+                                                            message.id === selectedReactionMessage?.id
+                                                    )?.reactions
+                                                ) === emoji
+                                                    ? 'bg-emerald-900 border-emerald-500'
+                                                    : 'bg-[#1F1F1F] border-white/10 hover:bg-[#292929]'
+                                            }`}
+                                    >
+                                        <span>{emoji}</span>
+
+                                        {#if getReactionCountForEmoji(
+                                            currentMessages.find(
+                                                (message) =>
+                                                    message.id === selectedReactionMessage?.id
+                                            )?.reactions,
+                                            emoji as "👍" | "😂" | "❤️" | "😭" | "🤬"
+                                        ) > 0}
+
+                                            <span class="text-sm text-gray-300">
+                                                {getReactionCountForEmoji(
+                                                    currentMessages.find(
+                                                        (message) =>
+                                                            message.id === selectedReactionMessage?.id
+                                                    )?.reactions,
+                                                    emoji as "👍" | "😂" | "❤️" | "😭" | "🤬"
+                                                )}
+                                            </span>
+
+                                        {/if}
+
+                                    </button>
+
+                                {/each}
+
+
+                            {:else}
+
+                                <!-- ONLY REACTIONS WITH COUNT > 0 -->
+                                {#each getReactionEmojis(
+                                    currentMessages.find(
+                                        (message) =>
+                                            message.id === selectedReactionMessage?.id
+                                    )?.reactions
+                                ) as emoji}
+
+                                    <button
+                                        onclick={() =>
+                                            handleReactionSelect(emoji)
+                                        }
+                                        class={`flex-1 h-12 min-w-0 rounded-full border
+                                            flex items-center justify-center gap-1 text-lg transition
+                                            ${
+                                                getMyReaction(
+                                                    currentMessages.find(
+                                                        (message) =>
+                                                            message.id === selectedReactionMessage?.id
+                                                    )?.reactions
+                                                ) === emoji
+                                                    ? 'bg-emerald-900 border-emerald-500'
+                                                    : 'bg-[#1F1F1F] border-white/10 hover:bg-[#292929]'
+                                            }`}
+                                    >
+                                        <span>{emoji}</span>
+
+                                        <span class="text-sm text-gray-300">
+                                            {getReactionCountForEmoji(
+                                                currentMessages.find(
+                                                    (message) =>
+                                                        message.id === selectedReactionMessage?.id
+                                                )?.reactions,
+                                                emoji
+                                            )}
+                                        </span>
+
+                                    </button>
+
+                                {/each}
+
+                            {/if}
+
+                    </div> 
+               </div> 
+
+                <!-- REACTION USERS -->
+                <div
+                    class="mt-1 max-h-[45vh] overflow-y-auto
+                        [&::-webkit-scrollbar]:hidden
+                        [-ms-overflow-style:none]
+                        scrollbar-none"
+                >
+
+                    {#each getReactionUsers(
+                        currentMessages.find(
+                            (message) =>
+                                message.id === selectedReactionMessage?.id
+                        )?.reactions
+                    ) as reactionUser}
+
+                        {@const user = $usersStore.users.find(
+                            (item) => item.uid === reactionUser.uid
+                        )}
+
+                        {#if reactionUser.uid === auth.currentUser?.uid}
+
+                            <!-- YOUR REACTION -->
+                            <button
+                                onclick={() =>
+                                    handleReactionSelect(
+                                        reactionUser.emoji
+                                    )
+                                }
+                                class="w-full flex items-center gap-4
+                                    px-4 py-3
+                                    text-left
+                                    hover:bg-white/5
+                                    rounded-xl
+                                    transition"
+                            >
+
+                                {#if $userStore?.profileImage}
+
+                                    <img
+                                        src={$userStore.profileImage}
+                                        alt="You"
+                                        class="w-14 h-14 rounded-full
+                                            object-cover shrink-0"
+                                    />
+
+                                {:else}
+
+                                    <div
+                                        class="w-14 h-14 rounded-full
+                                            bg-gray-700
+                                            flex items-center justify-center
+                                            text-white font-semibold
+                                            shrink-0"
+                                    >
+                                        You
+                                    </div>
+
+                                {/if}
+
+
+                                <div class="flex-1 min-w-0">
+
+                                    <p class="text-lg font-semibold text-white">
+                                        You
+                                    </p>
+
+                                    <p class="text-base text-gray-400">
+                                        Tap to remove
+                                    </p>
+
+                                </div>
+
+
+                                <span class="text-2xl shrink-0">
+                                    {reactionUser.emoji}
+                                </span>
+
+                            </button>
+
+
+                        {:else}
+
+                            <!-- OTHER USER REACTION -->
+                            <div
+                                class="w-full flex items-center gap-4
+                                    px-4 py-3
+                                    rounded-xl"
+                            >
+
+                                {#if user?.profileImage}
+
+                                    <img
+                                        src={user.profileImage}
+                                        alt={user.fullName}
+                                        class="w-14 h-14 rounded-full
+                                            object-cover shrink-0"
+                                    />
+
+                                {:else}
+
+                                    <div
+                                        class="w-14 h-14 rounded-full
+                                            bg-gray-700
+                                            flex items-center justify-center
+                                            text-white font-semibold
+                                            shrink-0"
+                                    >
+                                        {user?.fullName?.charAt(0) ?? '?'}
+                                    </div>
+
+                                {/if}
+
+
+                                <div class="flex-1 min-w-0">
+
+                                    <p
+                                        class="text-lg font-semibold text-white truncate"
+                                    >
+                                        {user?.fullName ?? 'Unknown user'}
+                                    </p>
+
+                                </div>
+
+
+                                <span class="text-2xl shrink-0">
+                                    {reactionUser.emoji}
+                                </span>
+
+                            </div>
+
+                        {/if}
+
+                    {/each}
+
+                </div>
+
+            </div>
+
+        </div>
+    {/if}
    
 
 </div>
@@ -2522,9 +3072,21 @@ function handleSwipe(
             filter: brightness(1.25);
         }
     }
+
+    :global(.animate-reaction-sheet) {
+        animation: reactionSheetUp 0.25s ease-out;
+    }
+
+    @keyframes reactionSheetUp {
+        from {
+            transform: translateY(100%);
+        }
+
+        to {
+            transform: translateY(0);
+        }
+    }
 </style>
-
-
 
 
 
